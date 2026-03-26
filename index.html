@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GCSE Exam Countdowns 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c26;
+    --border: #2a2a38;
+    --text: #e8e8f0;
+    --text-muted: #6b6b85;
+    --text-dim: #3a3a50;
+    --accent: #c8b8ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(200,184,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,184,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+
+  header { margin-bottom: 48px; }
+
+  .header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border: 1px solid rgba(200,184,255,0.3);
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(26px, 5vw, 42px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-top: 8px;
+  }
+
+  .live-clock {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: right;
+  }
+
+  .live-clock .time {
+    font-size: 20px;
+    color: var(--accent);
+    display: block;
+    margin-top: 2px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+    align-items: center;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .legend-swatch {
+    width: 32px;
+    height: 7px;
+    border-radius: 4px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid;
+    flex-shrink: 0;
+  }
+
+  .controls {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 32px;
+  }
+
+  .controls-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .filter-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .filter-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: rgba(107, 107, 107, 0.095);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.18s ease;
+    white-space: nowrap;
+  }
+
+  .filter-btn.enabled:hover { border-color: var(--accent); color: var(--accent); }
+
+  .filter-btn.active {
+    background: rgba(200,184,255,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .filter-btn.enabled {
+    background: transparent;
+  }
+
+  .exam-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .exam-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    border-radius: 10px;
+    padding: 16px 20px;
+    transition: transform 0.15s;
+    animation: slideIn 0.3s ease both;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .exam-card:hover { transform: translateX(2px); }
+
+  .exam-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .exam-subject { font-weight: 600; font-size: 15px; }
+
+  .exam-component {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .status-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .status-badge.inprogress {
+    background: rgba(168,85,247,0.18);
+    color: #d8b4fe;
+    border: 1px solid rgba(168,85,247,0.4);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .status-badge.over {
+    background: rgba(59,130,246,0.12);
+    color: #93c5fd;
+    border: 1px solid rgba(59,130,246,0.3);
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.55; }
+  }
+
+  .exam-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  .countdown-block {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .countdown-timer {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text);
+    white-space: nowrap;
+    min-width: 200px;
+  }
+
+  .countdown-timer.dim { color: var(--text-muted); }
+
+  .progress-wrap {
+    flex: 1;
+    min-width: 100px;
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    height: 100%;
+    border-radius: 3px;
+  }
+
+  .days-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    min-width: 80px;
+    text-align: right;
+  }
+
+  .section-divider {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 0 12px;
+  }
+
+  .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .count-info {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .count-info strong {
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    font-size: 14px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-top">
+      <div>
+        <div class="tag">2026 Exam Season</div>
+        <h1>GCSE <span>Countdowns</span></h1>
+        <p class="subtitle">All exams sorted by start time — AM = 09:00, PM = 13:30</p>
+      </div>
+      <div class="live-clock">
+        <span>Current time</span>
+        <span class="time" id="clock">--:--:--</span>
+      </div>
+    </div>
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:linear-gradient(to right,#22c55e,#eab308,#ef4444)"></div>
+        <span>Bar: full green = 100+ days · empty = exam start</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="border-color:#a855f7"></div>
+        <span>In Progress</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="border-color:#3b82f6"></div>
+        <span>Exam Over</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="controls-label">Filter by Subject</div>
+    <div class="filter-grid" id="filterGrid"></div>
+  </div>
+
+  <div class="count-info" id="countInfo"></div>
+  <div class="exam-list" id="examList"></div>
+  <div class="empty-state" id="emptyState">No exams found for this filter.</div>
+</div>
+
+<script>
+// ─── Raw data (durationMin = exam length in minutes) ─────────────────────────
+const RAW_EXAMS = [
+  {date:"06/05",board:"CIE",  level:"GCSE", code:"0990/11",   subject:"First Language English", component:"Paper 1 – Reading",                        session:"PM", durationMin:120},
+  {date:"07/05",board:"CIE",  level:"GCSE", code:"0977/12",   subject:"History",                component:"Paper 1 – Structured Questions",                        session:"AM", durationMin:120},
+  {date:"07/05",board:"AQA",  level:"GCSE", code:"8662/LH",   subject:"German",                 component:"Paper 1 – Listening",             session:"PM", durationMin:45},
+  {date:"07/05",board:"AQA",  level:"GCSE", code:"8662/RH",   subject:"German",                 component:"Paper 3 – Reading",               session:"14:30", durationMin:60},
+  {date:"08/05",board:"OCR",  level:"GCSE", code:"J282/01",   subject:"Latin",                  component:"Language Written Paper",          session:"AM", durationMin:90},
+  {date:"08/05",board:"CIE",  level:"GCSE", code:"0992/12",   subject:"Literature in English",  component:"Poetry and Prose",                        session:"AM", durationMin:90},
+  {date:"11/05",board:"CIE",  level:"GCSE", code:"0992/22",   subject:"Literature in English",  component:"Drama",                        session:"AM", durationMin:45},
+  {date:"11/05",board:"CIE",  level:"GCSE", code:"0992/32",   subject:"Literature in English",  component:"Unseen",                        session:"10:15", durationMin:75},
+  {date:"11/05",board:"Pearson",level:"GCSE",code:"1CN0/1H",  subject:"Chinese",                component:"Paper 1 – Listening Higher",      session:"PM", durationMin:45},
+  {date:"11/05",board:"Pearson",level:"GCSE",code:"1CN0/3H",  subject:"Chinese",                component:"Paper 3 – Reading Higher",        session:"14:30", durationMin:65},
+  {date:"11/05",board:"OCR",  level:"GCSE", code:"J292/01",   subject:"Classical Greek",        component:"Language Written Paper",          session:"PM", durationMin:90},
+  {date:"12/05",board:"AQA",  level:"GCSE", code:"8062/11-17",subject:"Religious Studies A",    component:"Paper 1",                         session:"AM", durationMin:105},
+  {date:"12/05",board:"Pearson",level:"IGCSE",code:"4BI1/1B", subject:"Biology",                component:"Paper 1B",                        session:"PM", durationMin:120},
+  {date:"13/05",board:"OCR",  level:"GCSE", code:"J384/01",   subject:"Geography B",            component:"Our Natural World",               session:"AM", durationMin:75},
+  {date:"13/05",board:"Pearson",level:"GCSE",code:"1CP2/01",  subject:"Computer Science",       component:"Paper 1 – Principles",            session:"PM", durationMin:90},
+  {date:"14/05",board:"Pearson",level:"IGCSE",code:"4MA1/1H", subject:"Mathematics A",          component:"Paper 1H Higher",                 session:"AM", durationMin:120},
+  {date:"14/05",board:"OCR",  level:"GCSE", code:"J198/01",   subject:"Ancient History",        component:"Greece and Persia",               session:"PM", durationMin:120},
+  {date:"14/05",board:"AQA",  level:"GCSE", code:"8662/WH",   subject:"German",                 component:"Paper 4 – Writing",               session:"PM", durationMin:75},
+  {date:"15/05",board:"CIE",  level:"GCSE", code:"0977/22",   subject:"History",                component:"Paper 2 – Document Questions",                        session:"AM", durationMin:105},
+  {date:"15/05",board:"CIE",  level:"GCSE", code:"0990/21",   subject:"First Language English", component:"Paper 2 – Directed Writing and Composition",                        session:"PM", durationMin:120},
+  {date:"15/05",board:"OCR",  level:"GCSE", code:"J282/02",   subject:"Latin",                  component:"Prose Literature A",              session:"PM", durationMin:60},
+  {date:"15/05",board:"OCR",  level:"GCSE", code:"J282/03",   subject:"Latin",                  component:"Prose Literature B",              session:"PM", durationMin:60},
+  {date:"18/05",board:"Pearson",level:"IGCSE",code:"4CH1/1C", subject:"Chemistry",              component:"Paper 1C",                        session:"AM", durationMin:120},
+  {date:"18/05",board:"Pearson",level:"GCSE",code:"1CN0/4H",  subject:"Chinese",                component:"Paper 4 – Writing Higher",        session:"PM", durationMin:85},
+  {date:"19/05",board:"Pearson",level:"GCSE",code:"1CP2/02",  subject:"Computer Science",       component:"Paper 2 – Computational Thinking",session:"PM", durationMin:120},
+  {date:"20/05",board:"AQA",  level:"GCSE", code:"8652/LH",   subject:"French",                 component:"Paper 1 – Listening",             session:"AM", durationMin:45},
+  {date:"20/05",board:"AQA",  level:"GCSE", code:"8652/RH",   subject:"French",                 component:"Paper 3 – Reading",               session:"10:15", durationMin:60},
+  {date:"20/05",board:"AQA",  level:"GCSE", code:"8062/2A-2B",subject:"Religious Studies A",    component:"Paper 2",                         session:"PM", durationMin:105},
+  {date:"21/05",board:"CIE",  level:"GCSE", code:"0978/12",   subject:"Music",                  component:"Listening Paper 12",              session:"AM", durationMin:75},
+  {date:"22/05",board:"OCR",  level:"GCSE", code:"J198/02",   subject:"Ancient History",        component:"Rome and its Neighbours",         session:"AM", durationMin:120},
+  {date:"22/05",board:"AQA",  level:"GCSE", code:"8633/LH",   subject:"Italian",                component:"Paper 1 – Listening",             session:"AM", durationMin:45},
+  {date:"22/05",board:"AQA",  level:"GCSE", code:"8633/RH",   subject:"Italian",                component:"Paper 3 – Reading",               session:"10:15", durationMin:60},
+  {date:"22/05",board:"OCR",  level:"GCSE", code:"J292/02",   subject:"Classical Greek",        component:"Prose Literature A",              session:"PM", durationMin:60},
+  {date:"01/06",board:"AQA",  level:"GCSE", code:"8633/WH",   subject:"Italian",                component:"Paper 4 – Writing",               session:"AM", durationMin:75},
+  {date:"01/06",board:"OCR",  level:"GCSE", code:"J292/04",   subject:"Classical Greek",        component:"Verse Literature A",              session:"PM", durationMin:60},
+  {date:"02/06",board:"Pearson",level:"IGCSE",code:"4PH1/1P", subject:"Physics",                component:"Paper 1P",                        session:"AM", durationMin:120},
+  {date:"02/06",board:"OCR",  level:"GCSE", code:"J282/04",   subject:"Latin",                  component:"Verse Literature A",              session:"PM", durationMin:60},
+  {date:"02/06",board:"OCR",  level:"GCSE", code:"J282/05",   subject:"Latin",                  component:"Verse Literature B",              session:"PM", durationMin:60},
+  {date:"03/06",board:"Pearson",level:"IGCSE",code:"4MA1/2H", subject:"Mathematics A",          component:"Paper 2H Higher",                 session:"AM", durationMin:120},
+  {date:"03/06",board:"OCR",  level:"GCSE", code:"J384/02",   subject:"Geography B",            component:"People and Society",              session:"PM", durationMin:75},
+  {date:"04/06",board:"AQA",  level:"GCSE", code:"8652/WH",   subject:"French",                 component:"Paper 4 – Writing",               session:"PM", durationMin:75},
+  {date:"08/06",board:"Pearson",level:"IGCSE",code:"4BI1/2B", subject:"Biology",                component:"Paper 2B",                        session:"AM", durationMin:75},
+  {date:"09/06",board:"AQA",  level:"GCSE", code:"8692/LH",   subject:"Spanish",                component:"Paper 1 – Listening",             session:"AM", durationMin:45},
+  {date:"09/06",board:"AQA",  level:"GCSE", code:"8692/RH",   subject:"Spanish",                component:"Paper 3 – Reading",               session:"10:15", durationMin:60},
+  {date:"11/06",board:"OCR",  level:"GCSE", code:"J384/03",   subject:"Geography B",            component:"Geographical Exploration",        session:"AM", durationMin:90},
+  {date:"11/06",board:"OCR",  level:"GCSE", code:"J282/06",   subject:"Latin",                  component:"Literature and Culture",          session:"PM", durationMin:60},
+  {date:"12/06",board:"Pearson",level:"IGCSE",code:"4CH1/2C", subject:"Chemistry",              component:"Paper 2C",                        session:"AM", durationMin:75},
+  {date:"15/06",board:"Pearson",level:"IGCSE",code:"4PH1/2P", subject:"Physics",                component:"Paper 2P",                        session:"AM", durationMin:75},
+  {date:"16/06",board:"AQA",  level:"GCSE", code:"8692/WH",   subject:"Spanish",                component:"Paper 4 – Writing",               session:"AM", durationMin:75},
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function makeStart(dateStr, session) {
+  const [d, m] = dateStr.split('/').map(Number);
+  let hours;
+  let minutes;
+  if (session === "AM" || session === "PM") {
+    hours = session === 'AM' ? 9 : 13;
+    minutes = session === 'AM' ? 15 : 30;
+  } else {
+    [hours, minutes] = session.split(':');
+  }
+  return new Date(2026, m - 1, d, hours, minutes, 0, 0);
+}
+
+function fmtDuration(min) {
+  const h = Math.floor(min / 60), m = min % 60;
+  if (!h) return `${m}m`;
+  if (!m) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function fmtTime(date) {
+  return `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+}
+
+// State: 'upcoming' | 'inprogress' | 'over'
+function getState(start, end, now) {
+  if (now < start) return 'upcoming';
+  if (now < end)   return 'inprogress';
+  return 'over';
+}
+
+// Progress fraction: 1.0 at 100+ days remaining, 0.0 at exam start
+function getFrac(msUntilStart) {
+  const days = msUntilStart / 86400000;
+  return Math.max(0, Math.min(1, days / 100));
+}
+
+// Red(0) → Yellow(0.5) → Green(1)
+function fracToColor(f) {
+  if (f <= 0) return 'rgb(239,68,68)';
+  if (f >= 1) return 'rgb(34,197,94)';
+  if (f < 0.5) {
+    const t = f / 0.5;
+    return `rgb(239,${Math.round(68 + 115*t)},${Math.round(68*(1-t))})`;
+  }
+  const t = (f - 0.5) / 0.5;
+  return `rgb(${Math.round(234 - 200*t)},${Math.round(179 + 18*t)},${Math.round(8 + 86*t)})`;
+}
+
+function fmtCountdown(ms) {
+  if (ms <= 0) return '00d 00h 00m 00s';
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  const m = Math.floor((ms % 3600000)  / 60000);
+  const s = Math.floor((ms % 60000)    / 1000);
+  return `${String(d).padStart(2,'0')}d ${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+}
+
+// ─── Build exam objects ───────────────────────────────────────────────────────
+const exams = RAW_EXAMS.map(e => {
+  const start = makeStart(e.date, e.session);
+  const end   = new Date(start.getTime() + e.durationMin * 60000);
+  return { ...e, start, end };
+}).sort((a, b) => a.start - b.start);
+
+const SUBJECTS = [...new Set(exams.map(e => e.subject))].sort();
+
+// ─── Filters ──────────────────────────────────────────────────────────────────
+let all = true;
+let activeFilters = new Set();
+const filterGrid = document.getElementById('filterGrid');
+
+['All', ...SUBJECTS].forEach(subj => {
+  const btn = document.createElement('button');
+  btn.textContent = subj;
+  if (subj === 'All') {
+    btn.className = 'filter-btn active';
+    btn.addEventListener('click', () => {
+      if (all) {
+        all = false;
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.add(activeFilters.has(b.textContent) ? 'active' : 'enabled'));
+        btn.classList.remove('active');
+      } else {
+        all = true;
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove(activeFilters.has(b.textContent) ? 'active' : 'enabled'));
+        btn.classList.add('active');
+      }
+      renderExams();
+    });
+  } else {
+    btn.className = 'filter-btn';
+    btn.addEventListener('click', () => {
+      if (!all) {
+        if (btn.classList.contains('active')) {
+          btn.classList.replace('active', 'enabled');
+          activeFilters.delete(subj);
+        } else {
+          btn.classList.replace('enabled', 'active');
+          activeFilters.add(subj);
+        }
+        renderExams();
+      }
+    });
+  }
+  filterGrid.appendChild(btn);
+});
+
+// ─── Render all cards ─────────────────────────────────────────────────────────
+function renderExams() {
+  const list      = document.getElementById('examList');
+  const emptyEl   = document.getElementById('emptyState');
+  const countInfo = document.getElementById('countInfo');
+  list.innerHTML  = '';
+
+  const now      = Date.now();
+  const filtered = all ? exams : exams.filter(e => activeFilters.has(e.subject));
+
+  if (!filtered.length) {
+    emptyEl.style.display = 'block';
+    countInfo.textContent = '';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  const upcoming   = filtered.filter(e => getState(e.start, e.end, now) === 'upcoming');
+  const inprogress = filtered.filter(e => getState(e.start, e.end, now) === 'inprogress');
+  const over       = filtered.filter(e => getState(e.start, e.end, now) === 'over');
+
+  countInfo.innerHTML =
+    `Showing <strong>${filtered.length}</strong> exam${filtered.length!==1?'s':''} &nbsp;·&nbsp; ` +
+    `<strong>${over.length}</strong> over &nbsp;·&nbsp; ` +
+    `<strong>${inprogress.length}</strong> in progress &nbsp;·&nbsp; ` +
+    `<strong>${upcoming.length}</strong> upcoming`;
+
+  // In-progress first, then upcoming by time, then past (reversed)
+  [...inprogress, ...upcoming].forEach((e, i) => list.appendChild(makeCard(e, i)));
+
+  if (over.length) {
+    const div = document.createElement('div');
+    div.className = 'section-divider';
+    div.textContent = 'Exam Over';
+    list.appendChild(div);
+    over.slice().reverse().forEach((e, i) =>
+      list.appendChild(makeCard(e, inprogress.length + upcoming.length + i)));
+  }
+}
+
+function makeCard(e, idx) {
+  const now   = Date.now();
+  const state = getState(e.start, e.end, now);
+  const msLeft = e.start - now;
+
+  const frac  = state === 'upcoming' ? getFrac(msLeft) : 0;
+  const color = state === 'upcoming'   ? fracToColor(frac)
+              : state === 'inprogress' ? '#a855f7'
+              :                          '#3b82f6';
+
+  const card = document.createElement('div');
+  card.className = `exam-card state-${state}`;
+  card.style.borderLeftColor = color;
+  card.style.animationDelay  = `${Math.min(idx * 20, 300)}ms`;
+  card.dataset.code = e.code;
+
+  // Timer text
+  let timerText = '', daysLabel = '';
+  if (state === 'upcoming') {
+    timerText = fmtCountdown(msLeft);
+    const d = Math.floor(msLeft / 86400000);
+    daysLabel = d === 0 ? 'Today!' : `${d} day${d!==1?'s':''} away`;
+  }
+
+  const statusBadge =
+    state === 'inprogress' ? `<span class="status-badge inprogress">● IN PROGRESS</span>` :
+    state === 'over'       ? `<span class="status-badge over">EXAM OVER</span>` : '';
+
+  card.innerHTML = `
+    <div class="exam-top">
+      <div>
+        <div class="exam-subject">${e.subject}</div>
+        <div class="exam-component">${e.component}</div>
+      </div>
+      ${statusBadge}
+    </div>
+    <div class="exam-meta">
+      <span class="badge">${e.date}/26</span>
+      <span class="badge">${e.board} ${e.level}</span>
+      <span class="badge">${fmtTime(e.start)} – ${fmtTime(e.end)}</span>
+      <span class="badge">⏱ ${fmtDuration(e.durationMin)}</span>
+    </div>
+    <div class="countdown-block">
+      <span class="countdown-timer${state!=='upcoming'?' dim':''}" data-code="${e.code}">
+        ${state === 'upcoming' ? timerText : '–'}
+      </span>
+      <div class="progress-wrap">
+        <div class="progress-bar"
+             data-bar="${e.code}"
+             style="width:${(frac*100).toFixed(3)}%; background:${color}"></div>
+      </div>
+      <span class="days-label" data-lbl="${e.code}">${daysLabel}</span>
+    </div>
+  `;
+  return card;
+}
+
+// ─── Live clock ───────────────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+
+// ─── Tick: update countdowns or re-render if a state change occurs ────────────
+let prevStates = {};
+exams.forEach(e => { prevStates[e.code] = getState(e.start, e.end, Date.now()); });
+
+function tick() {
+  const now = Date.now();
+
+  // Check for any state transitions
+  let changed = false;
+  exams.forEach(e => {
+    const s = getState(e.start, e.end, now);
+    if (prevStates[e.code] !== s) { prevStates[e.code] = s; changed = true; }
+  });
+  if (changed) { renderExams(); return; }
+
+  // Otherwise just update timers and bars for upcoming exams
+  document.querySelectorAll('[data-code]').forEach(el => {
+    if (!el.classList.contains('countdown-timer')) return;
+    const exam = exams.find(x => x.code === el.dataset.code);
+    if (!exam || getState(exam.start, exam.end, now) !== 'upcoming') return;
+
+    const msLeft = exam.start - now;
+    el.textContent = fmtCountdown(msLeft);
+
+    const frac  = getFrac(msLeft);
+    const color = fracToColor(frac);
+
+    const bar = document.querySelector(`[data-bar="${exam.code}"]`);
+    if (bar) { bar.style.width = (frac*100).toFixed(3)+'%'; bar.style.background = color; }
+
+    const card = el.closest('.exam-card');
+    if (card) card.style.borderLeftColor = color;
+
+    const lbl = document.querySelector(`[data-lbl="${exam.code}"]`);
+    if (lbl) {
+      const d = Math.floor(msLeft / 86400000);
+      lbl.textContent = d === 0 ? 'Today!' : `${d} day${d!==1?'s':''} away`;
+    }
+  });
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+renderExams();
+updateClock();
+setInterval(updateClock, 100);
+setInterval(tick, 100);
+</script>
+</body>
+</html>
