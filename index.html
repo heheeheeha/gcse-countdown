@@ -162,14 +162,12 @@
     transition: all 0.18s ease;
     white-space: nowrap;
   }
-
-  .filter-btn {
-    transition: all 0.18s ease;
-  }
-
-  .filter-btn:active {
-    transform: translateY(0);
-    opacity: 0.85;
+  
+  @media (hover: hover) and (pointer: fine) {
+	.filter-btn:hover {
+	  border-color: var(--accent);
+	  color: var(--accent);
+	}
   }
 
   .filter-btn.active {
@@ -182,29 +180,6 @@
     background: transparent;
   }
 
-  
-  .filter-btn:not(.enabled):not(.active):not(.red-btn):hover {
-    border-color: var(--border);
-    color: var(--text-muted);
-    background: rgba(255,255,255,0.03);
-    transform: translateY(-1px);
-  }
-
-  .filter-btn.enabled:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: rgba(200,184,255,0.08);
-    transform: translateY(-1px);
-  }
-
-  /* Disable hover temporarily after click */
-  .filter-btn.no-hover:hover {
-    border-color: var(--border) !important;
-    color: var(--text-muted) !important;
-    background: rgba(107, 107, 107, 0.095) !important;
-    transform: none !important;
-  }
-
   .exam-list { display: flex; flex-direction: column; gap: 10px; }
 
   .exam-card {
@@ -214,7 +189,7 @@
     border-radius: 10px;
     padding: 16px 20px;
     transition: transform 0.15s;
-    animation: slideIn 0.3s ease both;
+    animation: slideIn 0.3s ease;
   }
 
   @keyframes slideIn {
@@ -222,7 +197,9 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  .exam-card:hover { transform: translateX(2px); }
+  @media (hover: hover) and (pointer: fine) {
+    .exam-card:hover { transform: translateX(5px); }
+  }
 
   .exam-top {
     display: flex;
@@ -566,7 +543,7 @@ const filterGrid = document.getElementById('filterGrid');
   } else {
     btn.className = 'filter-btn';
     btn.addEventListener('click', () => {
-      allBtn = document.querySelector('#All');
+      const allBtn = document.querySelector('#All');
 
       if (all) {
         all = false;
@@ -577,15 +554,11 @@ const filterGrid = document.getElementById('filterGrid');
       if (btn.classList.contains('active')) {
         btn.classList.replace('active', 'enabled');
         activeFilters.delete(subj);
-        btn.classList.add('no-hover');
-        } else {
+      } else {
         btn.classList.replace('enabled', 'active');
         activeFilters.add(subj);
       }
       renderExams();
-    });
-    btn.addEventListener('mouseleave', () => {
-      btn.classList.remove('no-hover');
     });
   }
   filterGrid.appendChild(btn);
@@ -614,13 +587,6 @@ function renderExams() {
   list.innerHTML  = '';
 
   const now      = Date.now();
-
-  allBtn = document.querySelector('#All');
-  if (activeFilters.size == 0) {
-    allBtn.classList.add('active');
-    all = true;
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove(activeFilters.has(b.textContent) ? 'active' : 'enabled'));
-  }
 
   const filtered = all ? exams : exams.filter(e => activeFilters.has(e.subject));
 
@@ -749,12 +715,6 @@ function tick() {
 
     const card = el.closest('.exam-card');
     if (card) card.style.borderLeftColor = color;
-
-    // const lbl = document.querySelector(`[data-lbl="${exam.code}"]`);
-    // if (lbl) {
-    //   const d = Math.floor(msLeft / 86400000);
-    //   lbl.textContent = d === 0 ? 'Today!' : `${d} day${d!==1?'s':''} away`;
-    // }
   });
 }
 
