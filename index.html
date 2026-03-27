@@ -449,6 +449,31 @@ const RAW_EXAMS = [
   {date:"16/06",board:"AQA",  level:"GCSE", code:"8692/WH",   subject:"Spanish",                component:"Paper 4 - Writing",               session:"AM", durationMin:75},
 ];
 
+const STORAGE_KEY = 'filters';
+
+function saveFilters() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      all,
+      activeFilters: [...activeFilters]
+    }));
+  } catch (e) {}
+}
+
+function loadFilters() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      all: parsed.all,
+      activeFilters: new Set(parsed.activeFilters || [])
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function makeStart(dateStr, session) {
   const [d, m] = dateStr.split('/').map(Number);
@@ -518,16 +543,20 @@ const exams = RAW_EXAMS.map(e => {
 const SUBJECTS = [...new Set(exams.map(e => e.subject))].sort();
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
-let all = true;
-let activeFilters = new Set();
+const saved = loadFilters();
+let all           = saved ? saved.all           : true;
+let activeFilters = saved ? saved.activeFilters : new Set();
+
+activeFilters.forEach(s => { if (!SUBJECTS.includes(s)) activeFilters.delete(s); });
+
 const filterGrid = document.getElementById('filterGrid');
 
 ['All', ...SUBJECTS].forEach(subj => {
   const btn = document.createElement('button');
   btn.textContent = subj;
-  btn.id = subj
+  btn.id = subj;
   if (subj === 'All') {
-    btn.className = 'filter-btn active';
+    btn.className = 'filter-btn' + (all ? ' active' : ' enabled');
     btn.addEventListener('click', () => {
       if (all) {
         all = false;
@@ -538,10 +567,18 @@ const filterGrid = document.getElementById('filterGrid');
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove(activeFilters.has(b.textContent) ? 'active' : 'enabled'));
         btn.classList.add('active');
       }
+      saveFilters();
       renderExams();
     });
   } else {
-    btn.className = 'filter-btn';
+    if (all) {
+      btn.className = 'filter-btn';
+    } else if (activeFilters.has(subj)) {
+      btn.className = 'filter-btn active';
+    } else {
+      btn.className = 'filter-btn enabled';
+    }
+
     btn.addEventListener('click', () => {
       const allBtn = document.querySelector('#All');
 
@@ -558,6 +595,7 @@ const filterGrid = document.getElementById('filterGrid');
         btn.classList.replace('enabled', 'active');
         activeFilters.add(subj);
       }
+      saveFilters();
       renderExams();
     });
   }
@@ -576,6 +614,7 @@ document.getElementById('clearFilters').addEventListener('click', () => {
   const allBtn = document.querySelector('#All');
   if (allBtn) allBtn.classList.add('active');
 
+  saveFilters();
   renderExams();
 });
 
