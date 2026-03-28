@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GCSE Exam Countdowns 2026</title>
+<link rel="icon" type="image/x-icon" href="/gcse_favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -341,18 +342,20 @@
     font-size: 14px;
     display: none;
   }
+  
+  .filter-btn.red-btn {
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.08);
+  }
 
-.filter-btn.red-btn {
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #fca5a5;
-  background: rgba(239, 68, 68, 0.08);
-}
-
-.filter-btn.red-btn:hover {
-  border-color: #ef4444;
-  color: #fecaca;
-  background: rgba(239, 68, 68, 0.18);
-}
+  @media (hover: hover) and (pointer: fine) {
+    .filter-btn.red-btn:hover {
+      border-color: #ef4444;
+      color: #fecaca;
+      background: rgba(239, 68, 68, 0.18);
+    }
+  }
 </style>
 </head>
 <body>
