@@ -9,55 +9,187 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="header-top">
-                <div>
-                    <div class="tag">2026 Exam Season</div>
-                    <h1>GCSE <span>Countdown</span></h1>
+    <div class="page-layout">
+
+        <aside class="sidebar sidebar-left">
+
+            <div class="sidebar-panel">
+                <div class="sidebar-panel-label">Feeling tired?</div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-label">Play FunDaleGames</span>
+                        <div class="sidebar-section-line"></div>
+                    </div>
+                    <div class="sidebar-text">
+                        <p>A long day of revision can wear you out. Ease some of the pain with <a href="https://fundalegames.github.io">FunDaleGames</a>, our carefully-curated site for mentally enriching and enjoyable activities.</p>
+                    </div>
                 </div>
-                <div class="live-clock">
-                    <span>Current Date/Time</span>
-                    <span class="time" id="clock">DD/MM/YYYY | --:--:--</span>
-                    
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-label">Go for a walk</span>
+                        <div class="sidebar-section-line"></div>
+                    </div>
+                    <div class="sidebar-text">
+                        <p>Touching some grass can really help refocus the mind, you know.</p>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-label">Stare at things</span>
+                        <div class="sidebar-section-line"></div>
+                    </div>
+                    <div class="sidebar-text">
+                        <p>It's good for your eyes.</p>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="sidebar-panel">
+                <div class="sidebar-panel-label">Another Panel</div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-label">Humanities</span>
+                        <div class="sidebar-section-line"></div>
+                    </div>
+                    <div class="sidebar-text">
+                        <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim.</p>
+                        <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.</p>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-label">Creatives</span>
+                        <div class="sidebar-section-line"></div>
+                    </div>
+                    <div class="sidebar-text">
+                        <p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet consectetur adipisci velit.</p>
+                    </div>
+                </div>
+
+            </div>
+
+        </aside>
+
+        <!-- ── Main Content ── -->
+        <div class="container">
+            <header>
+                <div class="header-top">
+                    <div>
+                        <div class="tag">2026 Exam Season</div>
+                        <h1>GCSE <span>Countdown</span></h1>
+                    </div>
+                    <div class="live-clock">
+                        <span>Current Date/Time</span>
+                        <span class="time" id="clock">--:--:--</span>
+                    </div>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-swatch" style="background:linear-gradient(to right,#22c55e,#eab308,#ef4444)"></div>
+                        <span>Bar: full green = 100+ days · empty = exam start</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="border-color:#a855f7"></div>
+                        <span>In Progress</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="border-color:#3b82f6"></div>
+                        <span>Exam Over</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="controls">
+                <div class="controls-topbar">
+                    <div class="controls-topbar-left">
+                        <span class="controls-label" style="margin-bottom:0">Filter by Subject</span>
+                        <span class="filter-count" id="filterCount"></span>
+                    </div>
+                    <button class="compact-btn" id="compactBtn">Compact</button>
+                </div>
+
+                <div id="filterCategories"></div>
+
+                <div class="clear-btn-wrap" id="clearBtnWrap">
+                    <button id="clearFilters" class="filter-btn red-btn">✕ Clear Filters</button>
                 </div>
             </div>
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="legend-swatch" style="background:linear-gradient(to right,#22c55e,#eab308,#ef4444)"></div>
-                    <span>Bar: full green = 100+ days · empty = exam start</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-dot" style="border-color:#a855f7"></div>
-                    <span>In Progress</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-dot" style="border-color:#3b82f6"></div>
-                    <span>Exam Over</span>
-                </div>
-            </div>
-        </header>
-        
-        <div class="controls">
-            <div class="controls-topbar">
-                <div class="controls-topbar-left">
-                    <span class="controls-label" style="margin-bottom:0">Filter by Subject</span>
-                    <span class="filter-count" id="filterCount"></span>
-                </div>
-                <button class="compact-btn" id="compactBtn">Compact</button>
-            </div>
-            
-            <div id="filterCategories"></div>
-            
-            <div class="clear-btn-wrap" id="clearBtnWrap">
-                <button id="clearFilters" class="filter-btn red-btn">✕ Clear Filters</button>
-            </div>
+
+            <div class="count-info" id="countInfo"></div>
+            <div class="exam-list" id="examList"></div>
+            <div class="empty-state" id="emptyState">No exams found for this filter.</div>
         </div>
         
-        <div class="count-info" id="countInfo"></div>
-        <div class="exam-list" id="examList"></div>
-        <div class="empty-state" id="emptyState">No exams found for this filter.</div>
-        <script src="js/indexScript.js"></script>
+        <!-- ── Right Sidebar ── -->
+        <aside class="sidebar sidebar-right">
+
+            <div class="sidebar-panel">
+                <div class="sidebar-panel-label">useful information</div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-label">Date</span>
+                        <div class="sidebar-section-line"></div>
+                    </div>
+                    <div class="sidebar-text">
+                        <span class="time" id="date">DATE FETCH ERROR</span>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-label">Time</span>
+                        <div class="sidebar-section-line"></div>
+                    </div>
+                    <div class="sidebar-text">
+                        <span class="time" id="time">--:--:--</span>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-label">TIME UNTIL GCSES</span>
+                        <div class="sidebar-section-line"></div>
+                    </div>
+                    <div class="sidebar-text">
+                        <span class="time" id="remtime">--:--:--</span>
+                    </div>
+                </div>
+                
+            </div>
+            
+            <div class="sidebar-panel">
+                <div class="sidebar-panel-label">Another Panel</div>
+
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-label">Humanities</span>
+                        <div class="sidebar-section-line"></div>
+                    </div>
+                    <div class="sidebar-text">
+                        <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim.</p>
+                        <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.</p>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        <span class="sidebar-section-label">Creatives</span>
+                        <div class="sidebar-section-line"></div>
+                    </div>
+                    <div class="sidebar-text">
+                        <p>Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet consectetur adipisci velit.</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
+    <script src="js/indexScript.js"></script>
 </body>
 </html>

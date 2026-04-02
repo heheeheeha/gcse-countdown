@@ -30,12 +30,152 @@ body::before {
     z-index: 0;
 }
 
-.container {
+/*links*/
+a:link {
+    color: darkgoldenrod;
+    background-color: transparent;
+    text-decoration: none;
+}
+a:visited {
+    color: darkgoldenrod;
+    background-color: transparent;
+    text-decoration: none;
+}
+a:hover {
+    color: #49371b;
+    background-color: transparent;
+    text-decoration: none;
+}
+a:active {
+    color: goldenrod;
+    background-color: transparent;
+    text-decoration: underline;
+}
+
+/* ── Page layout: sidebars + main ── */
+.page-layout {
     position: relative;
     z-index: 1;
-    max-width: 960px;
+    display: grid;
+    grid-template-columns: 220px 1fr 220px;
+    grid-template-areas: "left main right";
+    gap: 0;
+    max-width: 1440px;
     margin: 0 auto;
+    align-items: start;
     padding: 40px 20px 80px;
+}
+
+/* ── Sidebar shared ── */
+.sidebar {
+    position: sticky;
+    top: 40px;
+    padding: 0 20px;
+}
+
+.sidebar-left  { grid-area: left; }
+.sidebar-right { grid-area: right; }
+
+.sidebar-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+}
+
+.sidebar-panel-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sidebar-panel-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.sidebar-section {
+    margin-bottom: 14px;
+}
+.sidebar-section:last-child {
+    margin-bottom: 0;
+}
+
+.sidebar-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.sidebar-section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+    padding: 2px 6px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+
+.sidebar-section-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.sidebar-text {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+.sidebar-text p {
+    margin-bottom: 6px;
+}
+.sidebar-text p:last-child {
+    margin-bottom: 0;
+}
+
+.sidebar-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    display: inline-block;
+    margin: 2px 2px 2px 0;
+}
+
+/* ── Main column ── */
+.container {
+    grid-area: main;
+    position: relative;
+    z-index: 1;
+    padding: 0 24px;
+}
+
+/* Hide sidebars and revert to simple layout on smaller screens */
+@media (max-width: 1100px) {
+    .page-layout {
+        grid-template-columns: 1fr;
+        grid-template-areas: "main";
+        padding: 40px 20px 80px;
+    }
+    .sidebar { display: none; }
+    .container { padding: 0; }
 }
 
 header { margin-bottom: 48px; }
@@ -99,15 +239,15 @@ h1 span { color: var(--accent); }
 .controls {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 10px; /* final */
-    padding: 14px;             /* final */
+    border-radius: 10px;
+    padding: 14px;
     margin-bottom: 32px;
 }
 
 /* ── Label ── */
 .controls-label {
     font-family: 'Space Mono', monospace;
-    font-size: 9px; /* final */
+    font-size: 9px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--text-muted);
@@ -119,7 +259,7 @@ h1 span { color: var(--accent); }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px; /* final */
+    margin-bottom: 10px;
     gap: 10px;
     flex-wrap: wrap;
 }
@@ -156,9 +296,9 @@ h1 span { color: var(--accent); }
 .filter-btn,
 .compact-btn {
     font-family: 'DM Sans', sans-serif;
-    font-size: 12px; /* final */
+    font-size: 12px;
     font-weight: 500;
-    padding: 4px 10px; /* final */
+    padding: 4px 10px;
     border-radius: 20px;
     border: 1px solid var(--border);
     background: rgba(107,107,107,0.095);
@@ -199,7 +339,7 @@ h1 span { color: var(--accent); }
     padding: 2px 4px;
 }
 
-/* compact toggle — same pill style but sits in the top bar */
+/* compact toggle */
 .compact-btn {
     font-family: 'DM Sans', sans-serif;
     font-size: 13px;
@@ -451,13 +591,6 @@ body.compact .exam-title-block {
     white-space: nowrap;
     width: 100%;
 }
-
-/* body.compact .exam-subject, 
-body.compact .exam-component {
-    display: block;
-    overflow: hidden;
-    text-overflow: clip; Clip instead of ellipsis to let the mask handle the fade
-} */
 
 /* hide badges entirely in compact */
 body.compact .exam-meta { display: none; }

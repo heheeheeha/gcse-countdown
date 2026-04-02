@@ -322,9 +322,12 @@ function makeCard(e,idx){
         </div>`;
     return card;
 }
+
 let dateFormatted;
+
 function updateDay() {
-    dateFormatted = new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'long',year:'numeric'})
+    dateFormatted = new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
+    document.getElementById('date').textContent = dateFormatted;
 }
 
 updateDay()
@@ -338,11 +341,17 @@ function updateClock(){
         `${dateFormatted} | ${timeFormatted}`;
 }
 
+function updateTime(){
+    let timeFormatted = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})
+    document.getElementById('time').textContent=timeFormatted;
+}
+
 let prevStates={};
 exams.forEach(e=>{prevStates[e.code]=getState(e.start,e.end,Date.now());});
 
 function tick(){
     const now=Date.now();
+    let firstPassed = false;
     let changed=false;
     exams.forEach(e=>{const s=getState(e.start,e.end,now);if(prevStates[e.code]!==s){prevStates[e.code]=s;changed=true;}});
     if(changed){renderExams();return;}
@@ -352,6 +361,10 @@ function tick(){
         if(!exam||getState(exam.start,exam.end,now)!=='upcoming')return;
         const msLeft=exam.start-now;
         el.textContent=fmtCountdown(msLeft);
+        if (!firstPassed) {
+            document.getElementById('remtime').textContent=fmtCountdown(msLeft);
+            firstPassed = true;
+        }
         const frac=getFrac(msLeft),color=fracToColor(frac);
         const bar=document.querySelector(`[data-bar="${exam.code}"]`);
         if(bar){bar.style.width=(frac*100).toFixed(3)+'%';bar.style.background=color;}
@@ -363,5 +376,5 @@ function tick(){
 renderExams();
 updateClock();
 setInterval(updateClock,100);
-
+setInterval(updateTime, 100);
 setInterval(tick,100);
