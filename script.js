@@ -281,7 +281,19 @@ function renderExams(){
         `<strong>${over.length}</strong> over &nbsp;·&nbsp; `+
         `<strong>${inprogress.length}</strong> in progress &nbsp;·&nbsp; `+
         `<strong>${upcoming.length}</strong> upcoming`;
-    [...inprogress,...upcoming].forEach((e,i)=>list.appendChild(makeCard(e,i)));
+    const halfTermStart = new Date(2026,4,23).getTime(); // 23 May 2026
+    const active = [...inprogress,...upcoming];
+    let halfTermInserted = false;
+    active.forEach((e,i)=>{
+        if(!halfTermInserted && e.start.getTime() >= halfTermStart){
+            const div=document.createElement('div');
+            div.className='section-divider half-term-divider';
+            div.innerHTML='🌿 Half Term';
+            list.appendChild(div);
+            halfTermInserted=true;
+        }
+        list.appendChild(makeCard(e,i));
+    });
     if(over.length){
         const div=document.createElement('div');div.className='section-divider';div.textContent='Exam Over';
         list.appendChild(div);
