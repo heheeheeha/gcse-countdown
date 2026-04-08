@@ -378,6 +378,7 @@ function tick(){
             document.getElementById('remtime').textContent=fmtCountdown(msLeft);
             firstPassed = true;
         }
+        document.getElementById('endremtime').textContent=fmtCountdown(exam.end-now);
         const frac=getFrac(msLeft),color=fracToColor(frac);
         const bar=document.querySelector(`[data-bar="${exam.code}"]`);
         if(bar){bar.style.width=(frac*100).toFixed(3)+'%';bar.style.background=color;}
