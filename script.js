@@ -50,7 +50,7 @@ const RAW_EXAMS = [
     {date:"16/06",board:"AQA",    level:"GCSE", code:"8692/WH",        subject:"Spanish",                        component:"Paper 4 - Writing",                                                session:"AM",        durationMin:75},
     {date:"08/05",board:"WJEC", level:"GCSE", code:"601/8420/6", subject:"Drama",                            component:"Interpreting Theatre",                                         session:"PM",        durationMin:90},
 ];
-const MAX_DAYS = 75;
+const MAX_DAYS = 60;
 
 // ── Subject categories ──────────────────────────────────────────────────────
 const CATEGORIES = [
