@@ -64,6 +64,7 @@ const CATEGORIES = [
 const STORAGE_KEY = 'filters_v3';
 const COMPACT_KEY = 'compact_mode';
 const CAL_KEY = 'calendar_mode';
+const PLANNER_KEY = 'planner';
 
 function saveFilters() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...activeFilters])); } catch(e){} }
 function loadFilters() { try { const r=localStorage.getItem(STORAGE_KEY); return r?new Set(JSON.parse(r)):new Set(); } catch(e){ return new Set(); } }
@@ -71,6 +72,8 @@ function saveCompact(v) { try { localStorage.setItem(COMPACT_KEY, v?'1':'0'); } 
 function loadCompact() { try { return localStorage.getItem(COMPACT_KEY)==='1'; } catch(e){ return false; } }
 function saveCal(active) {try {return localStorage.setItem(CAL_KEY, active ? 1 : 0);} catch(e) {return false;}}
 function loadCal() {try {return localStorage.getItem(CAL_KEY) == 1;} catch(e) {return false;}}
+function savePlanner(keys) {try {return localStorage.setItem(PLANNER_KEY, JSON.stringify(keys));} catch(e) {return false;}}
+function loadPlanner() {try {return localStorage.getItem(PLANNER_KEY)} catch(e) {return false;}}
 
 function makeStart(dateStr, session) {
     const [d,m]=dateStr.split('/').map(Number);
@@ -113,26 +116,30 @@ activeFilters.forEach(s=>{if(!ALL_SUBJECTS.includes(s))activeFilters.delete(s);}
 let calMode = loadCal();
 if (calMode) {document.body.classList.replace('compact', 'cal') ? null:document.body.classList.add('cal')};
 
-let compactMode= calMode ? 0:loadCompact();
+let compactMode = calMode ? 0:loadCompact();
 if(compactMode) {document.body.classList.replace('cal', 'compact') ? null:document.body.classList.add('compact')};
+
+let plannerMode = 0;
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const clearBtnWrap = document.getElementById('clearBtnWrap');
 const filterCountEl = document.getElementById('filterCount');
 const compactbtn = document.getElementById('compactbtn');
-const calBtn = document.getElementById('calbtn');
+const calbtn = document.getElementById('calbtn');
 const filterCatsEl = document.getElementById('filterCategories');
+const plannerbtn = document.getElementById('rev-planner');
+const modebtn = document.querySelector('.switch input')
 
 if(compactMode) compactbtn.classList.add('active');
-if(calMode) calBtn.classList.add('active');
+if(calMode) calbtn.classList.add('active');
 
-calBtn.addEventListener('click',()=>{
+calbtn.addEventListener('click',()=>{
     calMode=!calMode;
     compactMode=0;
     compactbtn.classList.remove('active');
     document.body.classList.remove('compact');
     document.body.classList.toggle('cal',calMode);
-    calBtn.classList.toggle('active',calMode);
+    calbtn.classList.toggle('active',calMode);
     saveCal(calMode);
     saveCompact(compactMode);
     renderExams();
@@ -141,7 +148,7 @@ calBtn.addEventListener('click',()=>{
 compactbtn.addEventListener('click',()=>{
     compactMode=!compactMode;
     calMode=0;
-    calBtn.classList.remove('active');
+    calbtn.classList.remove('active');
     document.body.classList.remove('cal');
     document.body.classList.toggle('compact',compactMode);
     compactbtn.classList.toggle('active',compactMode);
@@ -149,6 +156,16 @@ compactbtn.addEventListener('click',()=>{
     saveCal(calMode);
     renderExams();
 });
+
+plannerbtn.addEventListener('click', e => {
+    plannerMode=!plannerMode;
+    plannerbtn.classList.toggle('active', plannerMode);
+    toggleOtherStates();
+})
+
+modebtn.addEventListener('change', e => {
+    document.documentElement.classList.toggle('light')
+})
 
 // ── Smooth clear button animation ────────────────────────────────────────────
 let clearRaf=null;
@@ -448,7 +465,7 @@ function renderExams(){
                             col.appendChild(examDiv);
                         }
                     }
-                    console.log(col);
+                    //console.log(col);
                     //console.log(examsOnDay)
                 }
             }
@@ -491,6 +508,15 @@ function makeCard(e,idx){
             <div class="progress-wrap"><div class="progress-bar" data-bar="${e.code}" style="width:${(frac*100).toFixed(3)}%;background:${color}"></div></div>
         </div>`;
     return card;
+}
+
+function initRevisionPlanner() {
+    if (document.getElementById('examList').style.display === 'none') {
+        document.getElementById('examList').style.display = 'block';
+    } else {
+        document.getElementById('examList').style.display = 'none';
+        
+    }
 }
 
 let dateFormatted;
