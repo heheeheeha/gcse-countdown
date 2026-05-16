@@ -26,13 +26,15 @@ jobs:
           node-version: 24
 
       - name: Install tools
-        run: npm ci
+        run: npm install
 
       - name: Build assets
         run: |
+          npm list
+
           npx postcss styles.css -o styles.min.css
 
-          terser script.js -o script.min.js -c -m
+          npx terser script.js -o script.min.js -c -m
 
           VERSION=$(date +%s)
 
