@@ -1,0 +1,75 @@
+name: Build and Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install tools
+        run: npm ci
+
+      - name: Build assets
+        run: |
+          npx postcss styles.css -o styles.min.css
+
+          terser script.js -o script.min.js -c -m
+
+          VERSION=$(date +%s)
+
+          mv styles.min.css styles.min.$VERSION.css
+          mv script.min.js script.min.$VERSION.js
+
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Update HTML references
+        run: |
+          sed -i "s/styles\.css/styles.min.${VERSION}.css/g" index.html
+          sed -i "s/script\.js/script.min.${VERSION}.js/g" index.html
+
+      - name: Prepare site folder
+        run: |
+          mkdir site
+          cp index.html site/
+          cp styles.min.${VERSION}.css site/
+          cp script.min.${VERSION}.js site/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

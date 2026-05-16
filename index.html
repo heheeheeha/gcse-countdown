@@ -7,7 +7,8 @@
     <link rel="icon" type="image/x-icon" href="/gcse_favicon.svg">
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=0.102">
+    <link rel="stylesheet" href="styles.min.css"> <!-- version updates are not required now -->
+    <script src="https://cdn.jsdelivr.net/npm/@tsparticles/confetti@3.9.1/tsparticles.confetti.bundle.min.js"></script>
     <script src = 'https://code.jquery.com/jquery-3.6.3.min.js'></script>
     <script>
         if (localStorage.getItem('light_mode') === '1') {
@@ -25,8 +26,9 @@
     gtag('config', 'G-V4KCR1GRZR');
 </script>
 <body>
+    <div id="seaBackground"></div>
     <div class="top-bar">
-        <span>Check all dates and times on the <a target="_blank" rel="noonpener" href="https://pupils.stpaulsschool.org.uk/api/profile/publicexams/timetables/">Pupil Portal</a> before using.</span>
+        <span>Check all dates and times on the <a target="_blank" rel="noopener" href="https://pupils.stpaulsschool.org.uk/api/profile/publicexams/timetables/">Pupil Portal</a> before using.</span>
         <button id="topBarClose" class="top-bar-close" title="Hide this message">&times;</button>
     </div>
     <div class="page-layout">
@@ -121,11 +123,27 @@
                                 <span class="slider round"></span>
                             </label>
                         </div>
+                        <div class="controls-setting">
+                            <span>Progress Background</span>
+                            <span class="shortcut-label">W</span>
+                            <label class="switch">
+                                <input type="checkbox" id="seaEffectToggle">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
                         <div class="controls-setting" id="legacyUI">
                             <span>Legacy UI</span>
                             <span class="shortcut-label">E</span>
                             <label class="switch">
                                 <input type="checkbox" id="hideMenusToggle">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div class="controls-setting" id="showOngoingExamsWrapper" style="display: none;">
+                            <span>Show Ongoing Exams</span>
+                            <span class="shortcut-label">S</span>
+                            <label class="switch">
+                                <input type="checkbox" id="showOngoingExamsToggle" checked>
                                 <span class="slider round"></span>
                             </label>
                         </div>
@@ -243,13 +261,10 @@
                     <span class="shortcut-label">P</span>
                 </button>
             </div>
-            <div class="rev-planner-wrapper" style="display: none;">
-                <button id="rev-planner" class="btn" style="margin-bottom: 12px;">!!NEW!! Revision Planner</button>
-            </div>
 
             <div class="assistant" id="assistantPanel">
                 <div class="assistant-controls">
-                    <span class="assistant-label">Assistant <span class="tag">NEW</span> </span>
+                    <span class="assistant-label">Assistant</span>
                     <div class="assistant-tabs" id="assistantTabs">
                         <button class="asst-tab active" data-tab="input">Input</button>
                         <button class="asst-tab" data-tab="predictions">Predictions</button>
@@ -325,20 +340,63 @@
             <!-- ── Progress Tracker ── -->
             <div class="progress-tracker-container" id="progressTrackerContainer" style="display: none;">
                 <div class="progress-tracker">
-                    <div class="progress-circle-container">
-                        <svg class="progress-circle" viewBox="0 0 200 200">
-                            <defs>
-                                <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" style="stop-color:#a855f7;stop-opacity:1" />
-                                    <stop offset="100%" style="stop-color:#c8b8ff;stop-opacity:1" />
-                                </linearGradient>
-                            </defs>
-                            <circle class="progress-bg" cx="100" cy="100" r="95"></circle>
-                            <circle class="progress-fill" cx="100" cy="100" r="95"></circle>
-                        </svg>
-                        <div class="progress-text">
-                            <span class="progress-text-percent" id="progressCirclePercent">0%</span>
-                            <span class="progress-text-label">Complete</span>
+                    <div class="progress-circles-row">
+                        <div class="progress-circle-wrap">
+                            <div class="progress-circle-container">
+                                <svg class="progress-circle" viewBox="0 0 200 200">
+                                    <defs>
+                                        <linearGradient id="examsGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#3872d6;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#329ddb;stop-opacity:1" />
+                                        </linearGradient>
+                                    </defs>
+                                    <circle class="progress-bg" cx="100" cy="100" r="95"></circle>
+                                    <circle class="exams-fill circle-fill" cx="100" cy="100" r="95" style="stroke: url(#examsGradient);"></circle>
+                                </svg>
+                                <div class="progress-text">
+                                    <span class="progress-text-percent" id="examsCircleDone" style="color: #8fbaec;">4</span>
+                                    <span class="progress-text-label" id="examsCircleLabel">of 23 exams</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Circle 1: exam completion % -->
+                        <div class="progress-circle-wrap">
+                            <div class="progress-circle-container">
+                                <svg class="progress-circle" viewBox="0 0 200 200">
+                                    <defs>
+                                        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#a855f7;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#c8b8ff;stop-opacity:1" />
+                                        </linearGradient>
+                                    </defs>
+                                    <circle class="progress-bg" cx="100" cy="100" r="95"></circle>
+                                    <circle class="progress-fill circle-fill" cx="100" cy="100" r="95" style="stroke: url(#progressGradient);"></circle>
+                                </svg>
+                                <div class="progress-text">
+                                    <span class="progress-text-percent" id="progressCirclePercent" style="color: var(--accent);">0%</span>
+                                    <span class="progress-text-label" id="progressCircleLabel">of 0 GCSEs</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Circle 2: hours done vs total -->
+                        <div class="progress-circle-wrap">
+                            <div class="progress-circle-container">
+                                <svg class="progress-circle" viewBox="0 0 200 200">
+                                    <defs>
+                                        <linearGradient id="hoursGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#6ee7b7;stop-opacity:1" />
+                                        </linearGradient>
+                                    </defs>
+                                    <circle class="progress-bg" cx="100" cy="100" r="95"></circle>
+                                    <circle class="hours-fill circle-fill" cx="100" cy="100" r="95" style="stroke: url(#hoursGradient);"></circle>
+                                </svg>
+                                <div class="progress-text">
+                                    <span class="progress-text-percent" id="hoursCircleDone" style="color: #10b981;">0h</span>
+                                    <span class="progress-text-label" id="hoursCircleLabel">of 0h</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="progress-subjects">
@@ -443,7 +501,7 @@
         </aside>
     </div>
 
-    <script src="exams.js?v=0.01"></script>
-    <script src="script.js?v=0.103"></script>
+    <script src="exams.js?v=0.02"></script>
+    <script src="script.min.js"></script> <!-- version updates are not required now -->
 </body>
 </html>

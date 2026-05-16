@@ -1,0 +1,27 @@
+{
+  "name": "gcse-countdown.github.io",
+  "version": "1.0.0",
+  "description": "best gcse countdown clock  \r only a little bit vibecoded",
+  "main": "exams.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gcse-countdown/gcse-countdown.github.io.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/gcse-countdown/gcse-countdown.github.io/issues"
+  },
+  "homepage": "https://github.com/gcse-countdown/gcse-countdown.github.io#readme",
+  "devDependencies": {
+    "autoprefixer": "^10.5.0",
+    "cssnano": "^8.0.1",
+    "postcss": "^8.5.14",
+    "postcss-cli": "^11.0.1"
+  }
+}

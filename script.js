@@ -20,7 +20,7 @@ const COURSEWORK = {
     "Drama": 60,
 };
 
-const STORAGE_KEY = 'filters_v3';
+const FILTERS_KEY = 'filters_v3';
 const DISPLAY_MODE_KEY = 'display_mode_v1';
 const LEGACY_CAL_KEY = 'legacy_calendar_mode';
 const LIGHT_KEY = 'light_mode';
@@ -28,12 +28,16 @@ const PLANNER_KEY = 'planner';
 const SPEAKING_KEY = 'speaking_dates_v1';
 const HIDE_MENUS_KEY = 'hide_menus';
 const SHOW_OTHER_EXAMS_KEY = 'show_other_exams';
+const SHOW_ONGOING_EXAMS_KEY = 'show_ongoing_exams';
 const TOPBAR_KEY = 'topbar_hidden';
 const WEEKENDS_KEY = 'hide_weekends';
 const FILTER_COLLAPSED_KEY = 'filter_collapsed';
 const ADVANCED_KEY = 'advanced_options';
 const HIDE_APRIL_KEY = 'hide_april';
 const HIDE_ASSISTANT_KEY = 'hide_assistant';
+const SEA_EFFECT_KEY = 'sea_effect';
+const FINISHED_EXAMS_KEY = 'finished_exams';
+const SELECTED_CIRCLE_KEY = 'selected_progress_circle';
 
 const DISPLAY_MODE_DEFAULT = 0;
 const DISPLAY_MODE_COMPACT = 1;
@@ -44,17 +48,21 @@ const DISPLAY_MODE_ASSISTANT = 4;
 const SETTINGS_CONFIG = {
     [HIDE_MENUS_KEY]: { type: 'bool', default: false },
     [SHOW_OTHER_EXAMS_KEY]: { type: 'bool', default: false },
+    [SHOW_ONGOING_EXAMS_KEY]: { type: 'bool', default: true },
     [WEEKENDS_KEY]: { type: 'bool', default: true },
     [DISPLAY_MODE_KEY]: { type: 'int', default: DISPLAY_MODE_DEFAULT },
     [LEGACY_CAL_KEY]: { type: 'bool', default: false },
     [LIGHT_KEY]: { type: 'bool', default: false },
     [TOPBAR_KEY]: { type: 'bool', default: false },
     [FILTER_COLLAPSED_KEY]: { type: 'bool', default: false },
-    [STORAGE_KEY]: { type: 'set', default: new Set() },
+    [FILTERS_KEY]: { type: 'set', default: new Set() },
     [PLANNER_KEY]: { type: 'json', default: null },
     [SPEAKING_KEY]: { type: 'json', default: {} },
     [ADVANCED_KEY]: {type: 'bool', default: false},
     [HIDE_APRIL_KEY]: { type: 'bool', default: false },
+    [SEA_EFFECT_KEY]: { type: 'bool', default: true },
+    [FINISHED_EXAMS_KEY]: { type: 'set', default: new Set() },
+    [SELECTED_CIRCLE_KEY]: { type: 'string', default: 'progress' },
 };
 
 function load(key, defaultValue = undefined) {
@@ -107,6 +115,8 @@ function makeStart(dateStr, session) {
     return new Date(2026,m-1,d,+hours,+minutes,0,0);
 }
 
+const SEA_OFF_TARGET = -0.25;
+
 function fmtDuration(min){const h=Math.floor(min/60),m=min%60;if(!h)return`${m}m`;if(!m)return`${h}h`;return`${h}h ${m}m`;}
 function fmtTime(d){return`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
 function getState(start,end,now){if(now<start)return'upcoming';if(now<end)return'inprogress';return'over';}
@@ -122,6 +132,30 @@ function fmtCountdown(ms){
     const d=Math.floor(ms/86400000),h=Math.floor((ms%86400000)/3600000),
                 m=Math.floor((ms%3600000)/60000),s=Math.floor((ms%60000)/1000);
     return`${String(d).padStart(2,'0')}d ${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+}
+
+function makeCountdownBlock(ex, state, now, color, barId) {
+    const msUntilStart = ex.start - now;
+    const msUntilEnd = ex.end - now;
+    const timerText = state === 'upcoming'
+        ? fmtCountdown(msUntilStart)
+        : state === 'inprogress'
+            ? `Ends in ${fmtCountdown(msUntilEnd)}`
+            : '–';
+    const duration = ex.end - ex.start;
+    const barFraction = state === 'upcoming'
+        ? getFrac(msUntilStart)
+        : state === 'inprogress'
+            ? Math.max(0, Math.min(1, msUntilEnd / duration))
+            : 0;
+    const barColor = state === 'upcoming'
+        ? fracToColor(getFrac(msUntilStart))
+        : color;
+    const barStyle = `width:${(barFraction * 100).toFixed(3)}%;background:${barColor}`;
+    return `<div class="countdown-block">
+            <span class="countdown-timer" data-code="${barId}">${timerText}</span>
+            <div class="progress-wrap"><div class="progress-bar" data-bar="${barId}" style="${barStyle}"></div></div>
+        </div>`;
 }
 
 function buildSpeakingExams() {
@@ -196,7 +230,7 @@ function rebuildExams() {
 // Collect all subjects that actually appear in the data, plus coursework-only subjects
 const ALL_SUBJECTS = [...new Set([...baseExams.map(e => e.subject), ...Object.keys(COURSEWORK)])];
 
-let activeFilters=load(STORAGE_KEY) || [];
+let activeFilters=load(FILTERS_KEY) || [];
 let lastFilterCount = activeFilters.size;
 activeFilters.forEach(s=>{if(!ALL_SUBJECTS.includes(s))activeFilters.delete(s);});
 
@@ -211,13 +245,20 @@ if (displayMode === DISPLAY_MODE_CALENDAR) {
     document.body.classList.add('progress');
 }
 
+let lightMode = load(LIGHT_KEY);
+
 let weekends = load(WEEKENDS_KEY);
 
 let showOtherExams = load(SHOW_OTHER_EXAMS_KEY);
+let showOngoingExams = load(SHOW_ONGOING_EXAMS_KEY);
 
 let hideApril = load(HIDE_APRIL_KEY);
+let seaEffectEnabled = load(SEA_EFFECT_KEY);
+
+let selectedProgressCircle = load(SELECTED_CIRCLE_KEY, 'progress'); // 'progress', 'hours', 'exams'
 
 let plannerMode = 0;
+let currentFiltered = exams.slice();
 
 const clearBtnWrap = document.getElementById('clearBtnWrap');
 const filterCountEl = document.getElementById('filterCount');
@@ -239,27 +280,39 @@ const printBtn = document.getElementById('printBtn');
 
 const lightToggleTop = document.getElementById('lightToggleTop');
 const showOtherExamsToggle = document.getElementById('showOtherExamsToggle');
+const showOngoingExamsToggle = document.getElementById('showOngoingExamsToggle');
+const showOngoingExamsWrapper = document.getElementById('showOngoingExamsWrapper');
 const calModeOnly = document.querySelectorAll('.calModeOnly');
 const weekendsToggle = document.getElementById('weekendsToggle');
 const hideAprilToggle = document.getElementById('hideAprilToggle');
+const seaEffectToggle = document.getElementById('seaEffectToggle');
 if (weekendsToggle) weekendsToggle.addEventListener('change', e => setWeekends(e.target.checked));
 
 let advancedToggle = load(ADVANCED_KEY);
+let seaCanvas = null;
+let seaCtx = null;
+let seaAnimationId = null;
+let seaProgressPercent = 0;   // target progress (0–100)
+let seaDisplayPercent = null; // currently rendered progress (lerps toward target); null = uninitialised
+let seaWaveOffset = 0;
+let seaLastFrameTime = 0;
 
 function syncAllToggles() {
-        const isLight = document.documentElement.classList.contains('light');
+    const isLight = document.documentElement.classList.contains('light');
     if (lightToggleTop) lightToggleTop.checked = isLight;
     
     if (legacyCalToggle) legacyCalToggle.checked = legacyCalMode;
     if (showOtherExamsToggle) showOtherExamsToggle.checked = showOtherExams;
+    if (showOngoingExamsToggle) showOngoingExamsToggle.checked = showOngoingExams;
+    if (seaEffectToggle) seaEffectToggle.checked = seaEffectEnabled;
     if (weekendsToggle) weekendsToggle.checked = weekends;
     if (hideAprilToggle) hideAprilToggle.checked = hideApril;
-    
-        if (calModeOnly) {
+
+    if (calModeOnly) {
         calModeOnly.forEach((el) => {el.style.display = (displayMode === DISPLAY_MODE_CALENDAR && advancedToggle) ? 'flex' : 'none'});
     }
     
-        if(defaultbtn) defaultbtn.classList.toggle('active', displayMode === DISPLAY_MODE_DEFAULT);
+    if(defaultbtn) defaultbtn.classList.toggle('active', displayMode === DISPLAY_MODE_DEFAULT);
     if(compactbtn) compactbtn.classList.toggle('active', displayMode === DISPLAY_MODE_COMPACT);
     if(calbtn) calbtn.classList.toggle('active', displayMode === DISPLAY_MODE_CALENDAR);
     if(progressbtn) progressbtn.classList.toggle('active', displayMode === DISPLAY_MODE_PROGRESS);
@@ -288,6 +341,226 @@ function setShowOtherExams(on) {
     if (showOtherExamsToggle) showOtherExamsToggle.checked = on;
     save(SHOW_OTHER_EXAMS_KEY, showOtherExams);
     renderExams();
+}
+
+function setShowOngoingExams(on) {
+    showOngoingExams = on ? 1 : 0;
+    if (showOngoingExamsToggle) showOngoingExamsToggle.checked = on;
+    save(SHOW_ONGOING_EXAMS_KEY, showOngoingExams);
+    renderExams();
+}
+
+if (showOngoingExamsToggle) showOngoingExamsToggle.addEventListener('change', e => setShowOngoingExams(e.target.checked));
+if (seaEffectToggle) seaEffectToggle.addEventListener('change', e => setSeaEffect(e.target.checked));
+
+function getProgressPercent() {
+    const now = Date.now();
+    const allExams = activeFilters.size === 0 ? exams : (currentFiltered || exams);
+    const subjectStats = {};
+
+    allExams.forEach(e => {
+        const w = Number(e.weight) || 1;
+        if (!subjectStats[e.subject]) {
+            subjectStats[e.subject] = { totalWeight: 0, completedWeight: 0 };
+        }
+        subjectStats[e.subject].totalWeight += w;
+        if (getState(e.start, e.end, now) === 'over') {
+            subjectStats[e.subject].completedWeight += w;
+        }
+    });
+
+    Object.keys(COURSEWORK).forEach(subject => {
+        if ((activeFilters.size === 0 || activeFilters.has(subject)) && !subjectStats[subject]) {
+            subjectStats[subject] = { totalWeight: 0, completedWeight: 0 };
+        }
+    });
+
+    MFL_SUBJECTS.forEach(subject => {
+        if (activeFilters.size === 0 || activeFilters.has(subject)) {
+            if (!subjectStats[subject]) {
+                subjectStats[subject] = { totalWeight: 0, completedWeight: 0 };
+            }
+            const hasSpeakingExam = allExams.some(e => e.subject === subject && e.isSpeaking);
+            if (!hasSpeakingExam) {
+                subjectStats[subject].completedWeight = Math.min(subjectStats[subject].completedWeight + 1, 4);
+            }
+            subjectStats[subject].totalWeight = 4;
+        }
+    });
+
+    const subjects = Object.keys(subjectStats);
+    if (!subjects.length) return 0;
+
+    let overallFrac = 0;
+    subjects.forEach(subject => {
+        const stats = subjectStats[subject];
+        const cwPct = COURSEWORK[subject] || 0;
+        const writtenPct = 100 - cwPct;
+        const writtenDoneFrac = stats.totalWeight > 0 ? (stats.completedWeight / stats.totalWeight) : 0;
+        const subjectFrac = (cwPct + writtenDoneFrac * writtenPct) / 100;
+        overallFrac += subjectFrac / subjects.length;
+    });
+
+    return Number((overallFrac * 100).toFixed(1));
+}
+
+
+function updateSeaHeight(percent) {
+    seaProgressPercent = Number(percent) || 0;
+    const seaEl = document.getElementById('seaBackground');
+    if (seaEl && seaCanvas) resizeSeaCanvas();
+}
+
+function refreshSeaFromSelectedCircle() {
+    if (seaEffectEnabled) {
+        seaProgressPercent = getSeaTargetPercent();
+    }
+}
+
+function resizeSeaCanvas() {
+    const seaEl = document.getElementById('seaBackground');
+    if (!seaEl || !seaCanvas || !seaCtx) return;
+    const rect = seaEl.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    seaCanvas.width = rect.width * ratio;
+    seaCanvas.height = rect.height * ratio;
+    seaCanvas.style.width = `${rect.width}px`;
+    seaCanvas.style.height = `${rect.height}px`;
+    seaCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
+}
+
+function drawWave(layer, width, height, amplitude, offset, color, opacity, progress) {
+    const yBase = height * ((1 - progress) + layer * 0.05);
+    seaCtx.beginPath();
+    seaCtx.moveTo(0, height);
+    seaCtx.lineTo(0, yBase);
+    for (let x = 0; x <= width; x += 12) {
+        const theta = (x / width) * Math.PI * 2 * (1 + layer * 0.25) + offset;
+        const y = yBase + Math.sin(theta + layer) * amplitude * (1 - layer * 0.14);
+        seaCtx.lineTo(x, y);
+    }
+    seaCtx.lineTo(width, height);
+    seaCtx.closePath();
+    seaCtx.fillStyle = `rgba(${color}, ${opacity})`;
+    seaCtx.fill();
+}
+
+function drawSeaFrame(dt) {
+    if (!seaCanvas || !seaCtx) return;
+    const width  = seaCanvas.clientWidth;
+    const height = seaCanvas.clientHeight;
+    seaCtx.clearRect(0, 0, width, height);
+
+    // Target: if the effect is enabled, use real progress; otherwise sink off-screen.
+    const targetPercent = seaEffectEnabled
+        ? seaProgressPercent
+        : SEA_OFF_TARGET * 100;   // convert fraction → percent-space
+
+    // Initialise display on first frame.
+    if (seaDisplayPercent === null) {
+        seaDisplayPercent = seaEffectEnabled ? targetPercent : SEA_OFF_TARGET * 100;
+    }
+
+    // Smooth lerp — speed ~55 % of the gap per second, giving a silky ease-out.
+    const lerpSpeed = 5;   // higher = faster
+    const alpha = 1 - Math.exp(-lerpSpeed * dt);
+    seaDisplayPercent += (targetPercent - seaDisplayPercent) * alpha;
+
+    const progress = (seaDisplayPercent / 100) + 0.05;
+    const amplitude = 8 + Math.max(0, progress) * 18;
+
+    // Colour depends on which circle is selected
+    const SEA_COLORS = {
+        progress: lightMode ? '59,7,100'   : '126,58,158',  // purple
+        hours:    lightMode ? '14,116,144'  : '6,148,162',   // teal/cyan
+        exams:    lightMode ? '22,101,52'   : '21,128,61',   // green
+    };
+    const baseColor = SEA_COLORS[selectedProgressCircle] || SEA_COLORS.progress;
+
+    seaWaveOffset += 0.02 + randomInRange(0, 0.01);
+
+    drawWave(0, width, height, amplitude * 0.9, seaWaveOffset + randomInRange(0, 0.01), baseColor, 0.42, progress);
+    drawWave(1, width, height, amplitude * 0.72, seaWaveOffset - randomInRange(0, 0.01) * 1.18, baseColor, 0.32, progress);
+    drawWave(2, width, height, amplitude * 0.5, seaWaveOffset + randomInRange(0, 0.02) * 1.42, baseColor, 0.24, progress);
+
+    // Once the sea has fully sunk off-screen and the effect is disabled, stop animating.
+    if (!seaEffectEnabled && seaDisplayPercent <= SEA_OFF_TARGET * 100 + 0.2) {
+        cancelAnimationFrame(seaAnimationId);
+        seaAnimationId = null;
+        window.removeEventListener('resize', resizeSeaCanvas);
+        if (seaCanvas && seaCanvas.parentNode) seaCanvas.parentNode.removeChild(seaCanvas);
+        seaCanvas = null;
+        seaCtx = null;
+    }
+}
+
+function renderSeaWave(timestamp) {
+    const dt = seaLastFrameTime ? Math.min((timestamp - seaLastFrameTime) / 1000, 0.1) : 0.016;
+    seaLastFrameTime = timestamp;
+    drawSeaFrame(dt);
+    if (seaCanvas) seaAnimationId = requestAnimationFrame(renderSeaWave);
+}
+
+function createSeaCanvas() {
+    const seaEl = document.getElementById('seaBackground');
+    if (!seaEl || seaCanvas) return;
+    seaCanvas = document.createElement('canvas');
+    seaCanvas.id = 'seaCanvas';
+    seaCanvas.style.position = 'absolute';
+    seaCanvas.style.left = '0';
+    seaCanvas.style.top = '0';
+    seaCanvas.style.width = '100%';
+    seaCanvas.style.height = '100%';
+    seaCanvas.style.pointerEvents = 'none';
+    seaCanvas.style.opacity = '0.95';
+    seaCanvas.style.zIndex = '0';
+    seaEl.appendChild(seaCanvas);
+    seaCtx = seaCanvas.getContext('2d');
+    resizeSeaCanvas();
+    window.addEventListener('resize', resizeSeaCanvas);
+    seaLastFrameTime = 0;
+    seaAnimationId = requestAnimationFrame(renderSeaWave);
+}
+
+function getSeaTargetPercent() {
+    const now = Date.now();
+    const allExams = activeFilters.size === 0 ? exams : (currentFiltered || exams);
+
+    if (selectedProgressCircle === 'hours') {
+        const totalMin = allExams.reduce((sum, e) => sum + (Number(e.durationMin) || 0), 0);
+        const doneMin  = allExams.filter(e => getState(e.start, e.end, now) === 'over')
+                                 .reduce((sum, e) => sum + (Number(e.durationMin) || 0), 0);
+        return totalMin > 0 ? (doneMin / totalMin) * 100 : 0;
+    } else if (selectedProgressCircle === 'exams') {
+        const totalCount = allExams.length;
+        const doneCount  = allExams.filter(e => getState(e.start, e.end, now) === 'over').length;
+        return totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
+    } else {
+        return getProgressPercent();
+    }
+}
+
+function setSeaEffect(on) {
+    seaEffectEnabled = Boolean(on);
+    if (seaEffectToggle) seaEffectToggle.checked = seaEffectEnabled;
+    document.documentElement.classList.toggle('sea-effect-enabled', seaEffectEnabled);
+    save(SEA_EFFECT_KEY, seaEffectEnabled);
+
+    if (seaEffectEnabled) {
+        // Rise up from below: start display at off-screen position, then lerp up.
+        if (!seaCanvas) {
+            seaDisplayPercent = SEA_OFF_TARGET * 100;
+            createSeaCanvas();
+        }
+        seaProgressPercent = getSeaTargetPercent();
+    } else {
+        // Just set the target to off-screen; the render loop will animate the sink
+        // and then clean up the canvas itself once fully gone.
+        if (seaCanvas && !seaAnimationId) {
+            seaLastFrameTime = 0;
+            seaAnimationId = requestAnimationFrame(renderSeaWave);
+        }
+    }
 }
 
 function setWeekends(on) {
@@ -324,8 +597,9 @@ if (hideAprilToggle) {
 
 function updatePrintBtnVisibility() {
     if (!printBtn) return;
-    const hidden = displayMode === DISPLAY_MODE_PROGRESS || displayMode === DISPLAY_MODE_ASSISTANT;
-        printBtn.disabled = hidden;
+    // just let them print everything
+    // const hidden = displayMode === DISPLAY_MODE_PROGRESS || displayMode === DISPLAY_MODE_ASSISTANT;
+    //     printBtn.disabled = hidden;
 }
 
 function doPrint() {
@@ -378,17 +652,21 @@ function setDisplayMode(newMode) {
     
         switch (displayMode) {
         case DISPLAY_MODE_COMPACT:
+            console.log(advancedToggle)
+            document.getElementById("showOngoingExamsWrapper").style.display = advancedToggle ? "" : "none";
             document.body.classList.add('compact');
             if(compactbtn) compactbtn.classList.add('active');
             if(progressContainer) progressContainer.style.display = 'none';
             break;
         case DISPLAY_MODE_CALENDAR:
             document.body.classList.add('cal');
+            document.getElementById("showOngoingExamsWrapper").style.display = "none";
             if(calbtn) calbtn.classList.add('active');
             if(progressContainer) progressContainer.style.display = 'none';
             break;
         case DISPLAY_MODE_PROGRESS:
             document.body.classList.add('progress');
+            document.getElementById("showOngoingExamsWrapper").style.display = "none";
             if(progressbtn) progressbtn.classList.add('active');
             if(progressContainer) progressContainer.style.display = 'block';
             renderProgressTracker();
@@ -397,13 +675,14 @@ function setDisplayMode(newMode) {
             if(assistantmodebtn) assistantmodebtn.classList.add('active');
             if(progressContainer) progressContainer.style.display = 'none';
             document.getElementById('examList').style.display = 'none'; 
+            document.getElementById("showOngoingExamsWrapper").style.display = "none";
             break;
         case DISPLAY_MODE_DEFAULT:
         default:
+            document.getElementById("showOngoingExamsWrapper").style.display = advancedToggle ? "" : "none";
             if(defaultbtn) defaultbtn.classList.add('active');
             if(progressContainer) progressContainer.style.display = 'none';
     }
-    
         if (calModeOnly) {
         calModeOnly.forEach((el) => {
             if (el.id === 'hideAprilWrapper') {
@@ -462,7 +741,8 @@ function setAdvancedToggle(on) {
         document.getElementById("showOtherExamsWrapper").style.display = "none";
         document.getElementById("hideWeekends").style.display = "none";
         document.getElementById("hideAprilWrapper").style.display = "none";
-                document.querySelector(".controls-settings-box").classList.add("expanded");
+        document.getElementById("showOngoingExamsWrapper").style.display = "none";
+        document.querySelector(".controls-settings-box").classList.add("expanded");
     } else {
         console.log("active");
         advancedToggle = true;
@@ -475,8 +755,10 @@ function setAdvancedToggle(on) {
             if (!legacyCalMode) {
                 document.getElementById("hideAprilWrapper").style = "";
             }
-        }
-                document.querySelector(".controls-settings-box").classList.remove("expanded");
+        } 
+        console.log((displayMode === DISPLAY_MODE_DEFAULT || displayMode === DISPLAY_MODE_COMPACT))
+        document.getElementById("showOngoingExamsWrapper").style.display = (displayMode === DISPLAY_MODE_DEFAULT || displayMode === DISPLAY_MODE_COMPACT) ? "" : "none"; 
+        document.querySelector(".controls-settings-box").classList.remove("expanded");
     }
     save(ADVANCED_KEY, advancedToggle);
 }
@@ -517,8 +799,13 @@ document.addEventListener('keydown', (e) => {
     } else if (e.key === 'e' || e.key === 'E') {
         toggleMenusVisibility();
     } else if (e.key === 's' || e.key === 'S') {
-        e.preventDefault();
-        setShowOtherExams(!showOtherExams);
+        if (displayMode === DISPLAY_MODE_CALENDAR) {
+            e.preventDefault();
+            setShowOtherExams(!showOtherExams);
+        } else if (displayMode === DISPLAY_MODE_DEFAULT || displayMode === DISPLAY_MODE_COMPACT) {
+            e.preventDefault();
+            setShowOngoingExams(!showOngoingExams);
+        }
     } else if (e.key === 'd' || e.key === 'D') {
         e.preventDefault();
         setWeekends(!weekends);
@@ -534,6 +821,9 @@ document.addEventListener('keydown', (e) => {
     } else if (e.key === 'o' || e.key === 'O') {
         e.preventDefault();
         setAdvancedToggle(!advancedToggle);
+    } else if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        setSeaEffect(!seaEffectEnabled);
     } 
     
 });
@@ -738,7 +1028,7 @@ CATEGORIES.forEach(cat=>{
             else                 { activeFilters.add(s);        subjectBtnMap[s]&&subjectBtnMap[s].classList.add('active'); }
         });
         refreshCategoryLabels();
-        updateClearBtn(); updateFilterCount(); save(STORAGE_KEY, activeFilters); rebuildExams(); renderExams(); renderSpeakingDates();
+        updateClearBtn(); updateFilterCount(); save(FILTERS_KEY, activeFilters); rebuildExams(); renderExams(); renderSpeakingDates();
     });
 
     const line=document.createElement('div');
@@ -760,7 +1050,7 @@ CATEGORIES.forEach(cat=>{
             if(btn.classList.contains('active')){ btn.classList.remove('active'); activeFilters.delete(subj); }
             else { btn.classList.add('active'); activeFilters.add(subj); }
             refreshCategoryLabels();
-            updateClearBtn(); updateFilterCount(); save(STORAGE_KEY, activeFilters); rebuildExams(); renderExams(); renderSpeakingDates();
+            updateClearBtn(); updateFilterCount(); save(FILTERS_KEY, activeFilters); rebuildExams(); renderExams(); renderSpeakingDates();
         });
         grid.appendChild(btn);
     });
@@ -775,7 +1065,7 @@ document.getElementById('clearFilters').addEventListener('click',()=>{
     activeFilters.clear();
     Object.values(subjectBtnMap).forEach(b=>b.classList.remove('active'));
     refreshCategoryLabels();
-    updateClearBtn(); updateFilterCount(); save(STORAGE_KEY, activeFilters); rebuildExams(); renderExams(); renderSpeakingDates();
+    updateClearBtn(); updateFilterCount(); save(FILTERS_KEY, activeFilters); rebuildExams(); renderExams(); renderSpeakingDates();
 });
 
 function toggleMenusVisibility() {
@@ -869,8 +1159,6 @@ if (topBarClose) {
 
 
 let monthOffset = 0;
-
-let currentFiltered = exams.slice();
 
 function renderMultiMonthCalendar(list, active, filtered) {
     const wrapper = document.createElement('div');
@@ -1025,9 +1313,7 @@ function renderMultiMonthCalendar(list, active, filtered) {
             ? `<span class="status-badge inprogress">● IN PROGRESS</span>`
             : state === 'over' ? `<span class="status-badge over">EXAM OVER</span>` : '';
         const msLeft = ex.start - now;
-        const timerText = state === 'upcoming' ? fmtCountdown(msLeft) : '–';
-        const frac = state === 'upcoming' ? getFrac(msLeft) : 0;
-        const color = state === 'upcoming' ? fracToColor(frac) : state === 'inprogress' ? '#a855f7' : '#3b82f6';
+        const color = state === 'upcoming' ? fracToColor(getFrac(msLeft)) : state === 'inprogress' ? '#a855f7' : '#3b82f6';
         
                 if (!isOtherExam) {
             examDiv.style.borderLeftColor = color;
@@ -1049,10 +1335,7 @@ function renderMultiMonthCalendar(list, active, filtered) {
                 <span class="badge"><i class="fas fa-clock"></i> ${fmtTime(ex.start)} – ${fmtTime(ex.end)}</span>
                 <span class="badge"><i class="fas fa-hourglass"></i> ${fmtDuration(ex.durationMin)}</span>
             </div>
-            <div class="countdown-block">
-                <span class="countdown-timer${state !== 'upcoming' ? ' dim' : ''}" data-code="${ex.code}">${timerText}</span>
-                <div class="progress-wrap"><div class="progress-bar" data-bar="${ex.code}" style="width:${(getFrac(msLeft)*100).toFixed(3)}%;background:${fracToColor(getFrac(msLeft))}"></div></div>
-            </div>
+            ${makeCountdownBlock(ex, state, now, color, ex.code)}
         </div>`;
         td.appendChild(examDiv);
     });
@@ -1066,200 +1349,222 @@ function renderExams(){
     const now=Date.now();
     const filtered=activeFilters.size===0?exams:exams.filter(e=>activeFilters.has(e.subject));
     currentFiltered = filtered;
-    if(!filtered.length){emptyEl.style.display='block';countInfo.textContent='';return;}
-
-    emptyEl.style.display='none';
-    const upcoming =filtered.filter(e=>getState(e.start,e.end,now)==='upcoming');
-    const inprogress = filtered.filter(e=>getState(e.start,e.end,now)==='inprogress');
-    const over =filtered.filter(e=>getState(e.start,e.end,now)==='over');
-
-    countInfo.innerHTML=
-        `Showing <strong>${filtered.length}</strong> exam${filtered.length!==1?'s':''} &nbsp;·&nbsp; `+
-        `<strong>${over.length}</strong> over &nbsp;·&nbsp; `+
-        `<strong>${inprogress.length}</strong> in progress &nbsp;·&nbsp; `+
-        `<strong>${upcoming.length}</strong> upcoming`;
     
-    const halfTermStartMs = HALF_TERM_START.getTime();
-    let active = [...inprogress,...upcoming];
-    let halfTermInserted = false;
+    const upcoming = filtered.filter(e => getState(e.start,e.end,now) === 'upcoming');
+    const inprogress = filtered.filter(e => getState(e.start,e.end,now) === 'inprogress');
+    const over = filtered.filter(e => getState(e.start,e.end,now) === 'over');
+    const allInprogress = exams.filter(e => getState(e.start,e.end,now) === 'inprogress');
+    const otherInprogress = allInprogress.filter(e => !filtered.includes(e));
+    const otherCalendarExams = (displayMode === DISPLAY_MODE_CALENDAR && showOtherExams && activeFilters.size > 0)
+        ? exams.filter(e => !activeFilters.has(e.subject))
+        : [];
 
-        if (displayMode === DISPLAY_MODE_CALENDAR) {
-        active = filtered.slice();
-        
-                if (showOtherExams && activeFilters.size > 0) {
-            const otherExams = exams.filter(e => !activeFilters.has(e.subject));
-            active = [...active, ...otherExams];
-        }
-    }
+    const extraTotal = displayMode === DISPLAY_MODE_CALENDAR
+        ? otherCalendarExams.length
+        : (showOngoingExams ? otherInprogress.length : 0);
+    const extraOver = displayMode === DISPLAY_MODE_CALENDAR
+        ? otherCalendarExams.filter(e => getState(e.start,e.end,now) === 'over').length
+        : 0;
+    const extraInprogress = displayMode === DISPLAY_MODE_CALENDAR
+        ? otherCalendarExams.filter(e => getState(e.start,e.end,now) === 'inprogress').length
+        : (showOngoingExams ? otherInprogress.length : 0);
+    const extraUpcoming = displayMode === DISPLAY_MODE_CALENDAR
+        ? otherCalendarExams.filter(e => getState(e.start,e.end,now) === 'upcoming').length
+        : 0;
 
-    if (displayMode !== DISPLAY_MODE_CALENDAR) {
-        active.forEach((e,i)=>{
-            if(!halfTermInserted && e.start.getTime() >= halfTermStartMs){
-                const div=document.createElement('div');
-                div.className='section-divider half-term-divider';
-                div.innerHTML='<i class="fas fa-leaf"></i> Half Term';
-                list.appendChild(div);
-                halfTermInserted=true;
-            }
-            list.appendChild(makeCard(e,i));
-        });
-        if(over.length){
-            const div=document.createElement('div');div.className='section-divider';div.textContent='Exam Over';
-            list.appendChild(div);
-            over.slice().reverse().forEach((e,i)=>list.appendChild(makeCard(e,inprogress.length+upcoming.length+i)));
-        }
+    const displayCount = filtered.length + extraTotal;
+
+    const formatCount = (base, extra) =>
+        extra ? `<strong>${base}</strong><span class="count-info-extra">+${extra}</span>` : `<strong>${base}</strong>`;
+
+    countInfo.innerHTML =
+    `Showing ${formatCount(filtered.length, extraTotal)} exam${displayCount!==1?'s':''} &nbsp;·&nbsp; `+
+    `${formatCount(over.length, extraOver)} over &nbsp;·&nbsp; `+
+    `${formatCount(inprogress.length, extraInprogress)} in progress &nbsp;·&nbsp; `+
+    `${formatCount(upcoming.length, extraUpcoming)} upcoming`;
+
+    if (!displayCount) {
+        emptyEl.style.display='block';
     } else {
-        if (!legacyCalMode) {
-        renderMultiMonthCalendar(list, active, filtered);
-        } else {
-        const div = document.createElement('div');
-        const buttonsDiv = document.createElement('div');
-        buttonsDiv.className="buttonsDiv";
-        const monthBackBtn = document.createElement('button');
-        monthBackBtn.id='monthBackBtn';
-        monthBackBtn.textContent='← Prev';
+        emptyEl.style.display='none';
+        
+        const halfTermStartMs = HALF_TERM_START.getTime();
+        let active = [...(showOngoingExams && displayMode !== DISPLAY_MODE_CALENDAR ? allInprogress : inprogress), ...upcoming];
+        let halfTermInserted = false;
 
-        const monthText = document.createElement('p');
-        monthText.textContent="Loading..."
-        const monthFwdBtn = document.createElement('button');
-        monthFwdBtn.id='monthFwdBtn';
-        monthFwdBtn.textContent='Next →';
-        buttonsDiv.appendChild(monthBackBtn);
-        buttonsDiv.appendChild(monthText);
-        buttonsDiv.appendChild(monthFwdBtn);
-        list.appendChild(buttonsDiv)
-
-        div.className='calendar';
-        function getDay(date) {let day = date.getDay(); if (day == 0) day = 7; return day - 1;}
-        currentDate = new Date(Date.now());
-        offsetDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+monthOffset, 1)
-        monthText.textContent = offsetDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-        monthBackBtn.addEventListener('click' ,() => {
-            monthOffset -= 1;
-            offsetDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+monthOffset, 1);
-            monthText.textContent = offsetDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-            createCalendar(offsetDate.valueOf());
-            addExams();
-        })
-        monthFwdBtn.addEventListener('click' ,() => {
-            monthOffset += 1;
-            offsetDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+monthOffset, 1);
-            monthText.textContent = offsetDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-            createCalendar(offsetDate.valueOf());
-            addExams();
-        })
-        function createCalendar(dateMS) {
-            const today = new Date(Date.now());
-            let date = new Date(dateMS);
-            const curMonth = date.getMonth();
-            let table = '<table id="calendar"' + (weekends ? ' class="hide-weekends"' : '') + '><tr><th>MONDAY</th><th>TUESDAY</th><th>WEDNESDAY</th><th>THURSDAY</th><th>FRIDAY</th><th>SATURDAY</th><th>SUNDAY</th></tr><tr>';
-            for (let i = 0; i < getDay(date); i++) {table += '<td id="0 0">'+'</td>';}
-            while (date.getMonth() == curMonth) {
-                if (date.getFullYear() == today.getFullYear() && date.getMonth() == today.getMonth() && date.getDate() == today.getDate()) {
-                    table += '<td class="curMonth today" id="' + date.getDate() + " "+ date.getMonth() + '">' + date.getDate() + '</td>';
-                } else {
-                    table += '<td class="curMonth" id="' + date.getDate() + " "+ date.getMonth() + '">' + date.getDate() + '</td>';
-                }
-                if (getDay(date) % 7 == 6) {table += '</tr><tr>';}
-                date.setDate(date.getDate() + 1);
+            if (displayMode === DISPLAY_MODE_CALENDAR) {
+            active = filtered.slice();
+            
+                    if (showOtherExams && activeFilters.size > 0) {
+                const otherExams = exams.filter(e => !activeFilters.has(e.subject));
+                active = [...active, ...otherExams];
             }
-            if (getDay(date) != 0) {
-                for (let i = getDay(date); i < 7; i++) {
-                    table += '<td class="nextMonth" id="' + date.getDate() + " " + date.getMonth() + '">' + Number(date.getDate()) + '</td>';
+        }
+
+        if (displayMode !== DISPLAY_MODE_CALENDAR) {
+            active.forEach((e,i)=>{
+                if(!halfTermInserted && e.start.getTime() >= halfTermStartMs){
+                    const div=document.createElement('div');
+                    div.className='section-divider half-term-divider';
+                    div.innerHTML='<i class="fas fa-leaf"></i> Half Term';
+                    list.appendChild(div);
+                    halfTermInserted=true;
+                }
+                list.appendChild(makeCard(e,i));
+            });
+            if(over.length){
+                const div=document.createElement('div');div.className='section-divider';div.textContent='Exam Over';
+                list.appendChild(div);
+                over.slice().reverse().forEach((e,i)=>list.appendChild(makeCard(e,active.length+i)));
+            }
+        } else {
+            if (!legacyCalMode) {
+            renderMultiMonthCalendar(list, active, filtered);
+            } else {
+            const div = document.createElement('div');
+            const buttonsDiv = document.createElement('div');
+            buttonsDiv.className="buttonsDiv";
+            const monthBackBtn = document.createElement('button');
+            monthBackBtn.id='monthBackBtn';
+            monthBackBtn.textContent='← Prev';
+
+            const monthText = document.createElement('p');
+            monthText.textContent="Loading..."
+            const monthFwdBtn = document.createElement('button');
+            monthFwdBtn.id='monthFwdBtn';
+            monthFwdBtn.textContent='Next →';
+            buttonsDiv.appendChild(monthBackBtn);
+            buttonsDiv.appendChild(monthText);
+            buttonsDiv.appendChild(monthFwdBtn);
+            list.appendChild(buttonsDiv)
+
+            div.className='calendar';
+            function getDay(date) {let day = date.getDay(); if (day == 0) day = 7; return day - 1;}
+            currentDate = new Date(Date.now());
+            offsetDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+monthOffset, 1)
+            monthText.textContent = offsetDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+            monthBackBtn.addEventListener('click' ,() => {
+                monthOffset -= 1;
+                offsetDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+monthOffset, 1);
+                monthText.textContent = offsetDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+                createCalendar(offsetDate.valueOf());
+                addExams();
+            })
+            monthFwdBtn.addEventListener('click' ,() => {
+                monthOffset += 1;
+                offsetDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+monthOffset, 1);
+                monthText.textContent = offsetDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+                createCalendar(offsetDate.valueOf());
+                addExams();
+            })
+            function createCalendar(dateMS) {
+                const today = new Date(Date.now());
+                let date = new Date(dateMS);
+                const curMonth = date.getMonth();
+                let table = '<table id="calendar"' + (weekends ? ' class="hide-weekends"' : '') + '><tr><th>MONDAY</th><th>TUESDAY</th><th>WEDNESDAY</th><th>THURSDAY</th><th>FRIDAY</th><th>SATURDAY</th><th>SUNDAY</th></tr><tr>';
+                for (let i = 0; i < getDay(date); i++) {table += '<td id="0 0">'+'</td>';}
+                while (date.getMonth() == curMonth) {
+                    if (date.getFullYear() == today.getFullYear() && date.getMonth() == today.getMonth() && date.getDate() == today.getDate()) {
+                        table += '<td class="curMonth today" id="' + date.getDate() + " "+ date.getMonth() + '">' + date.getDate() + '</td>';
+                    } else {
+                        table += '<td class="curMonth" id="' + date.getDate() + " "+ date.getMonth() + '">' + date.getDate() + '</td>';
+                    }
+                    if (getDay(date) % 7 == 6) {table += '</tr><tr>';}
                     date.setDate(date.getDate() + 1);
                 }
-            }
-            table += '</tr></table>';
-            div.innerHTML = table;
-            list.appendChild(div);
-                        const calTable = document.getElementById("calendar");
-            if (calTable && calTable.rows) {
-                for (let i = 0; i < calTable.rows.length; i++) {
-                    calTable.rows[i].style.animationDelay = `${Math.min(i * 20, 300)}ms`;
+                if (getDay(date) != 0) {
+                    for (let i = getDay(date); i < 7; i++) {
+                        table += '<td class="nextMonth" id="' + date.getDate() + " " + date.getMonth() + '">' + Number(date.getDate()) + '</td>';
+                        date.setDate(date.getDate() + 1);
+                    }
+                }
+                table += '</tr></table>';
+                div.innerHTML = table;
+                list.appendChild(div);
+                            const calTable = document.getElementById("calendar");
+                if (calTable && calTable.rows) {
+                    for (let i = 0; i < calTable.rows.length; i++) {
+                        calTable.rows[i].style.animationDelay = `${Math.min(i * 20, 300)}ms`;
+                    }
                 }
             }
-        }
-        
-        function addExams() {
-            let table = document.getElementById("calendar");
-            for (let i=1, row; row=table.rows[i]; i++) {
-                for (let j=0, col; col=row.cells[j]; j++) {
-                    let nday = Number(col.id.split(" ")[0])
-                    let nmonth = Number(col.id.split(" ")[1]) + 1
-                    let examsOnDay = active.filter(e => [...e.date.split("/")][0] == nday && [...e.date.split("/")][1] == nmonth);
-                    if (examsOnDay.length > 0) {
-                        for (let i=0; i<examsOnDay.length; i++) {
-                            const ex = examsOnDay[i];
-                            const examDiv = document.createElement('div');
-                            examDiv.className = 'cal-exam';
-                            
-                                                        const isOtherExam = activeFilters.size > 0 && !activeFilters.has(ex.subject);
-                            if (isOtherExam) {
-                                examDiv.classList.add('other-exam');
-                            }
-                            
-                            examDiv.dataset.code = ex.code;
-                            const now = Date.now();
-                            const state = getState(ex.start, ex.end, now);
-                            const statusBadge = state === 'inprogress'
-                            ? `<span class="status-badge inprogress">● IN PROGRESS</span>`
-                            : state === 'over' ? `<span class="status-badge over">EXAM OVER</span>` : '';
-                            const msLeft = ex.start - now;
-                            const timerText = state === 'upcoming' ? fmtCountdown(msLeft) : '–';
-                            const frac=state==='upcoming'?getFrac(msLeft):0;
-                            const color=state==='upcoming'?fracToColor(frac):state==='inprogress'?'#a855f7':'#3b82f6';
-                            
-                                                        if (!isOtherExam) {
-                                examDiv.style.borderLeftColor = color;
-                            }
-                            
-                            examDiv.innerHTML = `<span class="cal-exam-subject">${ex.subject}</span><span class="cal-exam-component">${ex.component}</span>`;
-                            examDiv.innerHTML += `<div class="cal-exam-tooltip" style="border-left-color: ${color}">
-                                <div class="cal-tooltip-top">
-                                    <div class="cal-tooltip-title-block">
-                                        <span class="exam-subject">${ex.subject}</span>
-                                        <span class="exam-component">${ex.component}</span>
+            
+            function addExams() {
+                let table = document.getElementById("calendar");
+                for (let i=1, row; row=table.rows[i]; i++) {
+                    for (let j=0, col; col=row.cells[j]; j++) {
+                        let nday = Number(col.id.split(" ")[0])
+                        let nmonth = Number(col.id.split(" ")[1]) + 1
+                        let examsOnDay = active.filter(e => [...e.date.split("/")][0] == nday && [...e.date.split("/")][1] == nmonth);
+                        if (examsOnDay.length > 0) {
+                            for (let i=0; i<examsOnDay.length; i++) {
+                                const ex = examsOnDay[i];
+                                const examDiv = document.createElement('div');
+                                examDiv.className = 'cal-exam';
+                                
+                                                            const isOtherExam = activeFilters.size > 0 && !activeFilters.has(ex.subject);
+                                if (isOtherExam) {
+                                    examDiv.classList.add('other-exam');
+                                }
+                                
+                                examDiv.dataset.code = ex.code;
+                                const now = Date.now();
+                                const state = getState(ex.start, ex.end, now);
+                                const statusBadge = state === 'inprogress'
+                                ? `<span class="status-badge inprogress">● IN PROGRESS</span>`
+                                : state === 'over' ? `<span class="status-badge over">EXAM OVER</span>` : '';
+                                const msLeft = ex.start - now;
+                                const color = state === 'upcoming' ? fracToColor(getFrac(msLeft)) : state === 'inprogress' ? '#a855f7' : '#3b82f6';
+                                
+                                                            if (!isOtherExam) {
+                                    examDiv.style.borderLeftColor = color;
+                                }
+                                
+                                examDiv.innerHTML = `<span class="cal-exam-subject">${ex.subject}</span><span class="cal-exam-component">${ex.component}</span>`;
+                                examDiv.innerHTML += `<div class="cal-exam-tooltip" style="border-left-color: ${color}">
+                                    <div class="cal-tooltip-top">
+                                        <div class="cal-tooltip-title-block">
+                                            <span class="exam-subject">${ex.subject}</span>
+                                            <span class="exam-component">${ex.component}</span>
+                                        </div>
+                                        ${statusBadge}
                                     </div>
-                                    ${statusBadge}
-                                </div>
-                                <div class="exam-meta">
-                                    <span class="badge"><i class="fas fa-calendar"></i> ${ex.date}/26</span>
-                                    <span class="badge"><i class="fas fa-scroll"></i> ${ex.board} ${ex.level}</span>
-                                    <span class="badge"><i class="fas fa-code"></i> ${ex.code}</span>
-                                    <span class="badge"><i class="fas fa-clock"></i> ${fmtTime(ex.start)} – ${fmtTime(ex.end)}</span>
-                                    <span class="badge"><i class="fas fa-hourglass"></i> ${fmtDuration(ex.durationMin)}</span>
-                                </div>
-                                <div class="countdown-block">
-                                    <span class="countdown-timer${state !== 'upcoming' ? ' dim' : ''}" data-code="${ex.code}">${timerText}</span>
-                                    <div class="progress-wrap"><div class="progress-bar" data-bar="${ex.code}" style="width:${(getFrac(msLeft)*100).toFixed(3)}%;background:${fracToColor(getFrac(msLeft))}"></div></div>
-                                </div>
-                            </div>`;
-                            col.appendChild(examDiv);
+                                    <div class="exam-meta">
+                                        <span class="badge"><i class="fas fa-calendar"></i> ${ex.date}/26</span>
+                                        <span class="badge"><i class="fas fa-scroll"></i> ${ex.board} ${ex.level}</span>
+                                        <span class="badge"><i class="fas fa-code"></i> ${ex.code}</span>
+                                        <span class="badge"><i class="fas fa-clock"></i> ${fmtTime(ex.start)} – ${fmtTime(ex.end)}</span>
+                                        <span class="badge"><i class="fas fa-hourglass"></i> ${fmtDuration(ex.durationMin)}</span>
+                                    </div>
+                                    ${makeCountdownBlock(ex, state, now, color, ex.code)}
+                                </div>`;
+                                col.appendChild(examDiv);
+                            }
                         }
                     }
                 }
             }
+            createCalendar(offsetDate.valueOf());
+            addExams();
         }
-        createCalendar(offsetDate.valueOf());
-        addExams();
-    }
+        }
     }
 
-        updateSidebarTimers();
-
-        if (displayMode === DISPLAY_MODE_PROGRESS) renderProgressTracker();
+    if (seaEffectEnabled) {
+        updateSeaHeight(getSeaTargetPercent());
+    }
+    updateSidebarTimers();
+    if (displayMode === DISPLAY_MODE_PROGRESS) renderProgressTracker();
 }
 
 function makeCard(ex,idx){
     const now=Date.now(),state=getState(ex.start,ex.end,now),msLeft=ex.start-now;
-    const frac=state==='upcoming'?getFrac(msLeft):0;
-    const color=state==='upcoming'?fracToColor(frac):state==='inprogress'?'#a855f7':'#3b82f6';
+    const color=state==='upcoming'?fracToColor(getFrac(msLeft)):state==='inprogress'?'#a855f7':'#3b82f6';
     const card=document.createElement('div');
     card.className=`exam-card state-${state}${ex.isSpeaking?' speaking-card':''}`;
     card.style.borderLeftColor=color;
     card.style.animationDelay=`${Math.min(idx*20,300)}ms`;
     card.dataset.code=ex.code;
-    const timerText=state==='upcoming'?fmtCountdown(msLeft):'–';
     const statusBadge=state==='inprogress'
         ?`<span class="status-badge inprogress">● IN PROGRESS</span>`
         :state==='over'?`<span class="status-badge over">EXAM OVER</span>`:'';
@@ -1278,10 +1583,7 @@ function makeCard(ex,idx){
             <span class="badge"><i class="fas fa-clock"></i> ${fmtTime(ex.start)} – ${fmtTime(ex.end)}</span>
             <span class="badge"><i class="fas fa-hourglass"></i> ${fmtDuration(ex.durationMin)}</span>
         </div>
-        <div class="countdown-block">
-            <span class="countdown-timer${state!=='upcoming'?' dim':''}" data-code="${ex.code}">${timerText}</span>
-            <div class="progress-wrap"><div class="progress-bar" data-bar="${ex.code}" style="width:${(frac*100).toFixed(3)}%;background:${color}"></div></div>
-        </div>
+        ${makeCountdownBlock(ex, state, now, color, ex.code)}
         <div class="card-hover-tooltip">
             <div class="cal-tooltip-top">
                 <div class="cal-tooltip-title-block">
@@ -1297,11 +1599,8 @@ function makeCard(ex,idx){
                 <span class="badge"><i class="fas fa-clock"></i> ${fmtTime(ex.start)} – ${fmtTime(ex.end)}</span>
                 <span class="badge"><i class="fas fa-hourglass"></i> ${fmtDuration(ex.durationMin)}</span>
             </div>
-                <div class="countdown-block">
-                <span class="countdown-timer${state!=='upcoming'?' dim':''}" data-code="${ex.code}-hover">${timerText}</span>
-                <div class="progress-wrap"><div class="progress-bar" data-bar="${ex.code}-hover" style="width:${(frac*100).toFixed(3)}%;background:${color}"></div></div>
-                </div>
-                </div>`;
+            ${makeCountdownBlock(ex, state, now, color, `${ex.code}-hover`)}
+        </div>`;
     return card;
 }
 
@@ -1309,7 +1608,9 @@ function renderProgressTracker() {
     const now = Date.now();
     const allExams = activeFilters.size === 0 ? exams : currentFiltered;
 
-        const subjectStats = {};
+    let totalCompleted = 0;
+
+    const subjectStats = {};
     allExams.forEach(e => {
         const w = Number(e.weight) || 1;
         if (!subjectStats[e.subject]) {
@@ -1318,6 +1619,7 @@ function renderProgressTracker() {
         subjectStats[e.subject].totalWeight += w;
         if (getState(e.start, e.end, now) === 'over') {
             subjectStats[e.subject].completedWeight += w;
+            totalCompleted += 1;
         }
     });
 
@@ -1325,6 +1627,21 @@ function renderProgressTracker() {
     Object.keys(COURSEWORK).forEach(subject => {
         if ((activeFilters.size === 0 || activeFilters.has(subject)) && !subjectStats[subject]) {
             subjectStats[subject] = { totalWeight: 0, completedWeight: 0 };
+        }
+    });
+
+    // Always include MFL subjects in progress mode and treat the speaking exam as completed when it exists.
+    MFL_SUBJECTS.forEach(subject => {
+        if (activeFilters.size === 0 || activeFilters.has(subject)) {
+            if (!subjectStats[subject]) {
+                subjectStats[subject] = { totalWeight: 0, completedWeight: 0 };
+            }
+
+            const hasSpeakingExam = allExams.some(e => e.subject === subject && e.isSpeaking);
+            if (!hasSpeakingExam) {
+                subjectStats[subject].completedWeight = Math.min(subjectStats[subject].completedWeight + 1, 4);                
+            }
+            subjectStats[subject].totalWeight = 4;
         }
     });
 
@@ -1341,7 +1658,7 @@ function renderProgressTracker() {
         const subjectFrac = (cwPct + writtenDoneFrac * writtenPct) / 100;
         overallFrac += subjectFrac / numSubjects;
     });
-    const percent = numSubjects > 0 ? Math.round(overallFrac * 100 * 10) / 10 : 0;
+    const percent = numSubjects > 0 ? Number((overallFrac * 100).toFixed(1)) : 0;
 
         const completedPapers = allExams.filter(e => getState(e.start, e.end, now) === 'over').length;
     const totalPapers = allExams.length;
@@ -1349,23 +1666,101 @@ function renderProgressTracker() {
         const lastExam = allExams[allExams.length - 1];
     const daysRemaining = lastExam ? Math.max(0, Math.ceil((lastExam.end - now) / (1000 * 60 * 60 * 24))) : 0;
 
-        document.getElementById('progressCirclePercent').textContent = percent + '%';
+    document.getElementById('progressCircleLabel').textContent = `of ${numSubjects} GCSEs`;
+    document.getElementById('progressCirclePercent').textContent = percent + '%';
 
-        const circle = document.querySelector('.progress-fill');
+    const circle = document.querySelector('.progress-fill');
     if (circle) {
         const circumference = 595.9;
         circle.style.strokeDashoffset = circumference * (1 - percent / 100);
     }
 
-        const subjectsList = document.getElementById('progressSubjectsList');
+    // ── Hours circle ──
+    const totalMin = allExams.reduce((sum, e) => sum + (Number(e.durationMin) || 0), 0);
+    const doneMin  = allExams.filter(e => getState(e.start, e.end, now) === 'over')
+                            .reduce((sum, e) => sum + (Number(e.durationMin) || 0), 0);
+    const remainMin = totalMin - doneMin;
+
+    function fmtHoursMin(min) {
+        const h = Math.floor(min / 60), m = min % 60;
+        if (!h) return `${m}m`;
+        if (!m) return `${h}h`;
+        return `${h}h ${m}m`;
+    }
+
+    const hoursDoneEl      = document.getElementById('hoursCircleDone');
+    const hoursLabelEl     = document.getElementById('hoursCircleLabel');
+    const hoursCircle      = document.querySelector('.hours-fill');
+
+    if (hoursDoneEl)   hoursDoneEl.textContent   = fmtHoursMin(doneMin);
+    if (hoursLabelEl)  hoursLabelEl.textContent  = `of ${fmtHoursMin(totalMin)}`;
+    if (hoursCircle) {
+        const circumference = 595.9;
+        const hoursFrac = totalMin > 0 ? doneMin / totalMin : 0;
+        hoursCircle.style.strokeDashoffset = circumference * (1 - hoursFrac);
+    }
+
+    const examsDoneEl      = document.getElementById('examsCircleDone');
+    const examsLabelEl     = document.getElementById('examsCircleLabel');
+    const examsCircle      = document.querySelector('.exams-fill');
+
+    if (examsDoneEl)   examsDoneEl.textContent   = totalCompleted;
+    if (examsLabelEl)  examsLabelEl.textContent  = `of ${allExams.length} exams`;
+    if (examsCircle) {
+        const circumference = 595.9;
+        const examsFrac = allExams.length > 0 ? totalCompleted / allExams.length : 0;
+        examsCircle.style.strokeDashoffset = circumference * (1 - examsFrac);
+    }
+
+    const subjectsList = document.getElementById('progressSubjectsList');
     if (!subjectsList) return;
+
+    // ── Circle selection: click handlers + selected ring ──
+    const circleWrapEls = {
+        progress: document.querySelector('.progress-circle-wrap[data-circle="progress"]'),
+        hours:    document.querySelector('.progress-circle-wrap[data-circle="hours"]'),
+        exams:    document.querySelector('.progress-circle-wrap[data-circle="exams"]'),
+    };
+    // Fallback: if data-circle attrs not yet set, find them by content
+    if (!circleWrapEls.progress || !circleWrapEls.hours || !circleWrapEls.exams) {
+        const allWraps = document.querySelectorAll('.progress-circle-wrap');
+        if (allWraps.length >= 3) {
+            allWraps[0].dataset.circle = 'hours';
+            allWraps[1].dataset.circle = 'progress';
+            allWraps[2].dataset.circle = 'exams';
+            circleWrapEls.hours    = allWraps[0];
+            circleWrapEls.progress = allWraps[1];
+            circleWrapEls.exams    = allWraps[2];
+        }
+    }
+
+    function applyCircleSelection() {
+        Object.entries(circleWrapEls).forEach(([key, el]) => {
+            if (!el) return;
+            el.classList.toggle('circle-selected', key === selectedProgressCircle);
+        });
+    }
+
+    Object.entries(circleWrapEls).forEach(([key, el]) => {
+        if (!el || el._circleClickBound) return;
+        el._circleClickBound = true;
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', () => {
+            selectedProgressCircle = key;
+            save(SELECTED_CIRCLE_KEY, key);
+            applyCircleSelection();
+            refreshSeaFromSelectedCircle();
+        });
+    });
+
+    applyCircleSelection();
 
     subjectsList.innerHTML = '';
     Object.entries(subjectStats).sort((a, b) => a[0].localeCompare(b[0])).forEach(([subject, stats]) => {
         const cwPct = COURSEWORK[subject] || 0;
         const writtenPct = 100 - cwPct;
         const writtenFillPct = stats.totalWeight > 0 ? (stats.completedWeight / stats.totalWeight) * writtenPct : 0;
-        const countText = (writtenFillPct + cwPct).toFixed(1) + '%';
+        const countText = Number((writtenFillPct + cwPct).toFixed(1)) + '%';
 
         let html = '<div class="subject-progress-item">' +
             '<div class="subject-progress-label">' + subject + '</div>' +
@@ -1532,44 +1927,94 @@ function tick(){
     document.querySelectorAll('[data-code]').forEach(el=>{
         if(!el.classList.contains('countdown-timer'))return;
         const code = el.dataset.code.replace('-hover','');
-        const exam=exams.find(x=>x.code===code);
-        if(!exam||getState(exam.start,exam.end,now)!=='upcoming')return;
-        const msLeft=exam.start-now;
-        el.textContent=fmtCountdown(msLeft);
-        const frac=getFrac(msLeft),color=fracToColor(frac);
-                if (!el.dataset.code.endsWith('-hover')) {
-            const bar=document.querySelector(`[data-bar="${exam.code}"]`);
-            if(bar){bar.style.width=(frac*100).toFixed(3)+'%';bar.style.background=color;}
-            const barHover=document.querySelector(`[data-bar="${exam.code}-hover"]`);
-            if(barHover){barHover.style.width=(frac*100).toFixed(3)+'%';barHover.style.background=color;}
-            const card=el.closest('.exam-card');
-            if(card)card.style.borderLeftColor=color;
+        const exam = exams.find(x=>x.code===code);
+        if(!exam) return;
+        const state = getState(exam.start, exam.end, now);
+        if(state !== 'upcoming' && state !== 'inprogress') return;
+
+        const msLeft = exam.start - now;
+        const msUntilEnd = exam.end - now;
+        const timerText = state === 'upcoming'
+            ? fmtCountdown(msLeft)
+            : `Ends in ${fmtCountdown(msUntilEnd)}`;
+        el.textContent = timerText;
+
+        if (!el.dataset.code.endsWith('-hover')) {
+            const bar = document.querySelector(`[data-bar="${exam.code}"]`);
+            const barHover = document.querySelector(`[data-bar="${exam.code}-hover"]`);
+            if (state === 'upcoming') {
+                const frac = getFrac(msLeft);
+                const color = fracToColor(frac);
+                if(bar){bar.style.width=(frac*100).toFixed(3)+'%'; bar.style.background=color;}
+                if(barHover){barHover.style.width=(frac*100).toFixed(3)+'%'; barHover.style.background=color;}
+                const card = el.closest('.exam-card');
+                if(card) card.style.borderLeftColor = color;
+            } else {
+                const duration = exam.end - exam.start;
+                const frac = Math.max(0, Math.min(1, msUntilEnd / duration));
+                const color = '#a855f7';
+                if(bar){bar.style.width=(frac*100).toFixed(3)+'%'; bar.style.background=color;}
+                if(barHover){barHover.style.width=(frac*100).toFixed(3)+'%'; barHover.style.background=color;}
+            }
         }
     });
 }
 
-renderExams();
-updatePrintBtnVisibility();
-if (displayMode === DISPLAY_MODE_PROGRESS) renderProgressTracker();
-updateClock();
-setInterval(updateClock,100);
-setInterval(updateTime, 100);
-setInterval(tick,100);
+const examList = document.getElementById('examList');
 
-document.getElementById('examList').addEventListener('mouseenter', e => {
-    const pill = e.target.closest('.cal-exam');
-    if (!pill) return;
-    const tooltip = pill.querySelector('.cal-exam-tooltip');
-    if (!tooltip) return;
+function positionTooltip(pill, tooltip) {
     pill.classList.remove('flip-up', 'flip-left');
+
     tooltip.style.display = 'block';
+
     const tr = tooltip.getBoundingClientRect();
     const vw = document.documentElement.clientWidth;
     const vh = document.documentElement.clientHeight;
+
     if (tr.bottom > vh - 10) pill.classList.add('flip-up');
     if (tr.right > vw - 10) pill.classList.add('flip-left');
+
     tooltip.style.display = '';
+}
+
+// Desktop hover
+examList.addEventListener('mouseenter', e => {
+    const pill = e.target.closest('.cal-exam');
+    if (!pill) return;
+
+    const tooltip = pill.querySelector('.cal-exam-tooltip');
+    if (!tooltip) return;
+
+    positionTooltip(pill, tooltip);
 }, true);
+
+// Mobile tap
+document.addEventListener('click', e => {
+    const pill = e.target.closest('.cal-exam');
+
+    // Hide all tooltips first
+    document.querySelectorAll('.cal-exam.open').forEach(el => {
+        if (el !== pill) el.classList.remove('open');
+    });
+
+    // Clicked outside any exam
+    if (!pill) return;
+
+    const tooltip = pill.querySelector('.cal-exam-tooltip');
+    if (!tooltip) return;
+
+    e.stopPropagation();
+
+    const isOpen = pill.classList.contains('open');
+
+    document.querySelectorAll('.cal-exam.open')
+        .forEach(el => el.classList.remove('open'));
+
+    if (!isOpen) {
+        pill.classList.add('open');
+        positionTooltip(pill, tooltip);
+    }
+});
 
 document.getElementById('examList').addEventListener('mouseenter', e => {
     const card = e.target.closest('.exam-card');
@@ -1617,9 +2062,8 @@ if (countdownsMenu) {
     });
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
-    ASSISTANT MODULE
-   ══════════════════════════════════════════════════════════════════════════ */
+//ASSISTANT MODULE
+
 (function() {
 
 const ASST_KEY = 'asst_data_v1';
@@ -2471,4 +2915,122 @@ if (document.readyState === 'loading') {
 
 })();
 
+function randomInRange(min, max) {
+    return Math.random() * (max - min) + min;
+}
+function makeConfetti(coord_x) {
+    const count = 200,
+    defaults = {
+        origin: { y: 1, x: coord_x},
+    };
+
+    function fire(particleRatio, opts) {
+    confetti(
+        Object.assign({}, defaults, opts, {
+        particleCount: Math.floor(count * particleRatio),
+        })
+    );
+    }
+
+    fire(0.25, {
+    spread: 26,
+    startVelocity: 55,
+    });
+
+    fire(0.2, {
+    spread: 60,
+    });
+
+    fire(0.35, {
+    spread: 100,
+    decay: 0.91,
+    scalar: 0.8,
+    });
+
+    fire(0.1, {
+    spread: 120,
+    startVelocity: 25,
+    decay: 0.92,
+    scalar: 1.2,
+    });
+
+    fire(0.1, {
+    spread: 120,
+    startVelocity: 45,
+    });
+}
+
+window.addEventListener("load", (e) => {
+    if (activeFilters.size > 0) {
+        const lastsavedfinished = load(FINISHED_EXAMS_KEY);
+        let finishedExams = new Set();
+        for (const exam in currentFiltered) {
+            ex = (currentFiltered[exam]);
+            if (getState(ex.start, ex.end, Date.now()) == "over") {
+                finishedExams.add(`${ex.subject}: ${ex.component}`);
+            }
+        }
+        save(FINISHED_EXAMS_KEY, finishedExams);
+        if (finishedExams.difference(lastsavedfinished).size > 0) {
+            makeConfetti(0);
+            makeConfetti(0.125);
+            makeConfetti(0.25);
+            makeConfetti(0.5);
+            makeConfetti(0.625);
+            makeConfetti(0.75);
+            makeConfetti(0.875);
+            makeConfetti(1);
+            const popup = document.createElement("div");
+
+            popup.innerHTML = `
+                <button id="popupCloseBtn">✕</button>
+
+                <h2>🎉 Well done!</h2>
+
+                <p>
+                    You completed:
+                </p>
+
+                <div class="popup-exams">
+                    ${Array.from(finishedExams.difference(lastsavedfinished))
+                        .map(exam => `<div class="popup-exam">${exam}</div>`)
+                        .join("")}
+                </div>
+            `;
+
+            popup.querySelector("#popupCloseBtn").addEventListener("click", () => {
+                popup.remove();
+            });
+
+            popup.setAttribute("id", "popup");
+            document.body.appendChild(popup);
+            setTimeout(() => {
+                setSeaEffect(seaEffectEnabled);
+            }, 1500);
+        } else {
+            setSeaEffect(seaEffectEnabled);
+        }
+    } else {
+        setSeaEffect(seaEffectEnabled);
+    }
+});
+
+// addEventListener("beforeunload", (e) => {
+//     let finishedExams = new Set();
+//     for (const exam in currentFiltered) {
+//         ex = (currentFiltered[exam]);
+//         if (getState(ex.start, ex.end, Date.now()) == "over") {
+//             finishedExams.add(`${ex.subject}: ${ex.component}`)
+//         }
+//     }
+//     save(FINISHED_EXAMS_KEY, finishedExams); //comment out for testing so you can just add other exams to test
+// });
+
 setAdvancedToggle(advancedToggle);
+renderExams();
+updatePrintBtnVisibility();
+if (displayMode === DISPLAY_MODE_PROGRESS) renderProgressTracker();
+updateClock();
+setInterval(updateClock,100);
+setInterval(updateTime, 100);
+setInterval(tick,100);
