@@ -30,8 +30,6 @@ jobs:
 
       - name: Build assets
         run: |
-          npm list
-
           npx postcss styles.css -o styles.min.css
 
           npx terser script.js -o script.min.js -c -m
@@ -45,6 +43,8 @@ jobs:
 
       - name: Update HTML references
         run: |
+          echo "${VERSION}"
+
           sed -i "s/styles\.css/styles.min.${VERSION}.css/g" index.html
           sed -i "s/script\.js/script.min.${VERSION}.js/g" index.html
 
