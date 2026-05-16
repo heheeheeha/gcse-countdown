@@ -43,8 +43,6 @@ jobs:
 
       - name: Update HTML references
         run: |
-          echo "${VERSION}"
-
           sed -i "s/styles\.css/styles.min.${VERSION}.css/g" index.html
           sed -i "s/script\.js/script.min.${VERSION}.js/g" index.html
 
@@ -52,6 +50,7 @@ jobs:
         run: |
           mkdir site
           cp index.html site/
+          cp -r static site/
           cp styles.min.${VERSION}.css site/
           cp script.min.${VERSION}.js site/
 
